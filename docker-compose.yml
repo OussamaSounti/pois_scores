@@ -1,0 +1,22 @@
+# Morocco Spatial Dashboard — Phase 0: Postgres only
+# Backend service added in Phase 3.
+
+services:
+  db:
+    image: postgis/postgis:15-3.5-alpine
+    environment:
+      POSTGRES_USER: poi_user
+      POSTGRES_PASSWORD: poi_password
+      POSTGRES_DB: poi_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poi_user -d poi_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
