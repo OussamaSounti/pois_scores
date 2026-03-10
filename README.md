@@ -1,0 +1,72 @@
+# Morocco Spatial Dashboard
+
+POI-based spatial scores for any location in Morocco. Single-location and batch endpoints; dashboard for analysts and internal tools. Data lives in PostgreSQL (schema and data from a provided dump).
+
+## Repository (GitLab)
+
+This project is version-controlled on **GitLab**. Clone and push via GitLab:
+
+```bash
+# Clone (replace with your GitLab repo URL)
+git clone https://gitlab.com/your-group/morocco-spatial-dashboard.git
+cd morocco-spatial-dashboard
+
+# Or if you created a new repo: init and push
+git init
+git remote add origin https://gitlab.com/your-group/morocco-spatial-dashboard.git
+git add .
+git commit -m "chore: Phase 0 foundation — Docker Postgres, docs, env example"
+git push -u origin main
+```
+
+Use the `main` branch as default; use feature branches and Merge Requests for changes.
+
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+- [Git](https://git-scm.com/)
+- (Later) Python 3.11+ for local backend runs
+
+## Quick start (Phase 0)
+
+1. **Copy environment file**
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` if you change the DB user, password, or database name (they must match `docker-compose.yml` and the restore step).
+
+2. **Start Postgres**
+   ```bash
+   docker compose up -d db
+   ```
+   Wait until the DB is healthy (`docker compose ps`).
+
+3. **Restore the POI dump**
+   The application uses a PostgreSQL dump (`.dump` or `.sql`) as the source of schema and data. Restore it **after** the first start. See [docs/RUNBOOK.md](docs/RUNBOOK.md) for exact commands (`pg_restore` or `psql`).
+
+4. **Document the schema**
+   After restore, inspect tables in `psql` and record the actual table and column names in [docs/DATA_MODEL.md](docs/DATA_MODEL.md). The backend will use this to query POIs (no schema creation in code).
+
+## Environment variables
+
+| Variable        | Description                    | Example |
+|----------------|--------------------------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string   | `postgresql://poi_user:poi_password@localhost:5432/poi_db` |
+| `LOG_LEVEL`    | Log level (debug, info, etc.)  | `info`  |
+| `CORS_ORIGINS` | Allowed origins (comma-separated) | `http://localhost:3000` |
+
+See `.env.example` for a template. Do not commit `.env`.
+
+## Documentation
+
+- [docs/RUNBOOK.md](docs/RUNBOOK.md) — Restore dump, run Postgres, debug connection
+- [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — Actual POI table(s) and columns (fill after restore)
+- [PROJECT_SPEC.md](PROJECT_SPEC.md) — Full project specification and phased plan
+
+## Next steps
+
+- **Phase 1:** Backend API (FastAPI), single-location score endpoint, health checks
+- **Phase 2:** Batch endpoint, validation, tests
+- **Phase 3:** Backend in Docker, GitLab CI
+- **Phase 4:** Dashboard (single, batch, map)
+- **Phase 5:** Docs and polish
