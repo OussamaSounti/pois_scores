@@ -1,5 +1,4 @@
-# Morocco Spatial Dashboard — Phase 0: Postgres only
-# Backend service added in Phase 3.
+# Morocco Spatial Dashboard — DB + Backend
 
 services:
   db:
@@ -17,6 +16,20 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://poi_user:poi_password@db:5432/poi_db
+      LOG_LEVEL: info
+      CORS_ORIGINS: http://localhost:3000,http://localhost:8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data:
