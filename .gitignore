@@ -63,8 +63,8 @@ yarn-error.log*
 .docker/
 
 # Dump files (often large; keep out of repo unless small sample)
-  *.dump
-  *.sql
+*.dump
+*.sql
 
 # Logs and temp
 *.log
