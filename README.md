@@ -27,7 +27,7 @@ Use the `main` branch as default; use feature branches and Merge Requests for ch
 - [Git](https://git-scm.com/)
 - Python 3.11+ for running the backend
 
-## Quick start (Phase 0)
+## Quick start
 
 1. **Copy environment file**
    ```bash
@@ -35,11 +35,16 @@ Use the `main` branch as default; use feature branches and Merge Requests for ch
    ```
    Edit `.env` if you change the DB user, password, or database name (they must match `docker-compose.yml` and the restore step).
 
-2. **Start Postgres**
+2. **Start the stack (DB + backend)**
+   ```bash
+   docker compose up -d
+   ```
+   This starts Postgres and the backend API. Wait until both are up (`docker compose ps`). API: http://localhost:8000/docs
+
+   To start only Postgres (e.g. to restore the dump first):
    ```bash
    docker compose up -d db
    ```
-   Wait until the DB is healthy (`docker compose ps`).
 
 3. **Restore the POI dump**
    The application uses a PostgreSQL dump (`.dump` or `.sql`) as the source of schema and data. Restore it **after** the first start. See [docs/RUNBOOK.md](docs/RUNBOOK.md) for exact commands (`pg_restore` or `psql`).
@@ -47,7 +52,7 @@ Use the `main` branch as default; use feature branches and Merge Requests for ch
 4. **Document the schema**
    After restore, inspect tables in `psql` and record the actual table and column names in [docs/DATA_MODEL.md](docs/DATA_MODEL.md). The backend will use this to query POIs (no schema creation in code).
 
-## Run the API (Phase 1)
+## Run the API (local, without Docker)
 
 With Postgres running and the dump restored:
 
@@ -61,7 +66,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - **Single-location score:** GET or POST `/api/v1/scores` (query params or body `{"lat": 33.5, "lon": -7.6}`)  
 - **Health:** GET `/health`, GET `/ready`
 
-Set `DATABASE_URL` in `.env` at the project root (or export it) so the backend can connect to Postgres; the app loads `.env` from the current working directory when run from `backend/`.
+Set `DATABASE_URL` in `.env` at the project root (or export it) so the backend can connect to Postgres; the app loads `.env` from the current working directory when run from `backend/`. When using **Docker Compose**, the backend container uses `DATABASE_URL` with host `db` (set in `docker-compose.yml`).
 
 ## Run tests
 
@@ -99,8 +104,17 @@ See `.env.example` for a template. Do not commit `.env`.
 - [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — Actual POI table(s) and columns (fill after restore)
 - [PROJECT_SPEC.md](PROJECT_SPEC.md) — Full project specification and phased plan
 
+## CI/CD (GitLab)
+
+The pipeline (`.gitlab-ci.yml`) runs on push:
+
+- **lint:** Ruff check and format on `backend/`
+- **test:** Postgres (PostGIS) service, init minimal schema, then `pytest` with coverage
+- **build:** Docker build of the backend image (on the default branch)
+
+Ensure `.env` is not committed; CI uses its own variables and the Postgres service.
+
 ## Next steps
 
-- **Phase 3:** Backend in Docker, GitLab CI
 - **Phase 4:** Dashboard (single, batch, map)
 - **Phase 5:** Docs and polish
