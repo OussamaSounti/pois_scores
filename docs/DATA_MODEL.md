@@ -1,43 +1,91 @@
 # Data model (from restored dump)
 
-The POI schema is **not** defined by application migrations. It comes from the colleague’s PostgreSQL dump. This file should be filled **after** the first restore so the backend and docs stay aligned with the real database.
-
-## How to fill this
-
-1. Restore the dump (see [RUNBOOK.md](RUNBOOK.md)).
-2. Connect: `docker compose exec db psql -d poi_db -U poi_user`
-3. Run `\dt` and note the POI-related table(s).
-4. For each table, run `\d table_name` and copy the column list and types here.
-5. Note whether PostGIS is used (e.g. a `geometry` column) or only `latitude`/`longitude`.
+The POI schema comes from the PostgreSQL dump. The backend **reads** these tables only; it does not create or alter them. Use this document to query the correct schema, table, and column names.
 
 ---
 
-## Tables (to be filled after restore)
+## Main table for POI scores: `production.pois`
 
-### Example placeholder
+All score endpoints (single location and batch) should query **`production.pois`**. This is the canonical POI table for the API.
 
-| Table  | Purpose        | Notes |
-|--------|----------------|-------|
-| `pois` | POI records    | *(Replace with actual table name and columns)* |
+| Column          | Type             | Nullable | Default   | Description        |
+|-----------------|------------------|----------|-----------|--------------------|
+| id              | bigint           | NOT NULL | sequence  | Primary key        |
+| osm_id          | text             | YES      | —         | OpenStreetMap ID   |
+| name            | text             | NOT NULL | `'Unnamed'` | POI name        |
+| fclass          | text             | NOT NULL | —         | Fine class (e.g. bus_stop, pharmacy) |
+| super_category  | text             | NOT NULL | —         | Category (e.g. Transport, Healthcare) |
+| latitude        | double precision | NOT NULL | —         | Latitude           |
+| longitude       | double precision | NOT NULL | —         | Longitude          |
+| geom            | geometry         | —        | —         | PostGIS geometry (used in spatial indexes) |
 
-### POI table columns (example — replace with actual from `\d`)
+**Indexes**
 
-| Column          | Type     | Description        |
-|-----------------|----------|--------------------|
-| id              | bigint   | Primary key        |
-| name            | text     | POI name           |
-| fclass          | text     | e.g. bus_stop      |
-| super_category  | text     | e.g. Transport     |
-| latitude        | numeric  |                    |
-| longitude       | numeric  |                    |
+| Index                   | Type  | Definition                          |
+|-------------------------|-------|-------------------------------------|
+| idx_prod_coords         | btree | (latitude, longitude)               |
+| idx_prod_fclass         | —     | fclass                              |
+| idx_prod_geom           | gist  | (geom)                              |
+| idx_prod_geom_geog      | gist  | (geom::geography)                   |
+| idx_prod_name           | —     | name                                |
+| idx_prod_super_category | —     | super_category                      |
 
-If the dump uses different names (e.g. `lat`/`lon`, `type` instead of `fclass`), document them here. The backend will use these names for queries.
+Use `latitude` / `longitude` for simple distance or bbox logic; use `geom` (and the gist indexes) for PostGIS spatial queries (e.g. ST_DWithin, ST_Distance).
+
+---
+
+## Other POI-related tables (reference)
+
+These live in the **`poi`** schema. The API is built on **`production.pois`**; the tables below are documented for context and possible future use.
+
+### `poi.categories`
+
+Lookup table for category codes and names.
+
+| Column       | Type        | Nullable | Default | Description   |
+|--------------|-------------|----------|---------|---------------|
+| id           | integer     | NOT NULL | —       | Primary key   |
+| code         | varchar(50) | NOT NULL | —       | Category code |
+| name         | varchar(100)| NOT NULL | —       | Display name  |
+| parent_code  | varchar(50) | YES      | —       | FK → poi.categories(code) |
+| description  | text        | YES      | —       |               |
+| created_at   | timestamptz | YES      | now()   |               |
+
+**Relationship:** `parent_code` → `poi.categories(code)` (self-reference). Referenced by `poi.points_of_interest(category_code)`.
+
+### `poi.points_of_interest`
+
+Alternative POI table with geometry and address fields; not the main table for the score API.
+
+| Column         | Type               | Nullable | Default | Description   |
+|----------------|--------------------|----------|---------|---------------|
+| id             | bigint             | NOT NULL | —       | Primary key   |
+| osm_id         | varchar(20)        | YES      | —       |               |
+| name           | varchar(255)       | YES      | —       |               |
+| category_code  | varchar(50)        | YES      | —       | FK → poi.categories(code) |
+| geom           | geometry(Point,4326)| NOT NULL | —       | PostGIS point |
+| address        | text               | YES      | —       |               |
+| city           | varchar(100)       | YES      | —       |               |
+| province       | varchar(100)       | YES      | —       |               |
+| region         | varchar(100)       | YES      | —       |               |
+| tags           | jsonb              | YES      | '{}'    |               |
+| source         | varchar(50)        | YES      | 'osm'   |               |
+| created_at     | timestamptz        | YES      | —       |               |
+| updated_at     | timestamptz        | YES      | —       |               |
+
+**Indexes:** idx_poi_category, idx_poi_city, idx_poi_geom gist (geom), idx_poi_name_trgm, idx_poi_tags.
+
+**Relationship:** `category_code` → `poi.categories(code)`.
 
 ---
 
 ## Spatial indexing
 
-- If the dump includes a **PostGIS** geometry column and spatial index, note it here (e.g. `geography(Point, 4326)`, index name).
-- If the dump has only **latitude/longitude** columns, the backend will use bounding-box + Haversine; note that here.
+- **`production.pois`** (main table for the API): has both **latitude** and **longitude** (double precision) and a PostGIS **geom** column. Indexes include:
+  - **btree** on `(latitude, longitude)` for bbox/distance-style queries.
+  - **gist** on `geom` and on `geom::geography` for PostGIS spatial queries (e.g. `ST_DWithin`, `ST_Distance`).
+- **`poi.points_of_interest`**: uses **geometry(Point, 4326)** in `geom` (not null), with a **gist** index on `geom` for spatial queries.
 
-*(Update this section after inspecting the restored schema.)*
+For the score API, prefer **`production.pois`** and use either:
+- btree + app-side Haversine, or  
+- PostGIS on `geom` / `geom::geography` for “within radius” and distance, depending on backend choice.
