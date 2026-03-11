@@ -36,8 +36,8 @@ def get_session_factory():
 
 def get_db() -> Generator[Session, None, None]:
     """Dependency that yields a DB session."""
-    SessionLocal = get_session_factory()
-    session = SessionLocal()
+    session_local = get_session_factory()
+    session = session_local()
     try:
         yield session
     finally:

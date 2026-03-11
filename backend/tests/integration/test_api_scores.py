@@ -85,10 +85,7 @@ class TestBatchScores:
         assert "entropy_fclass" in data["results"][0]["scores"]
 
     def test_batch_order_preserved(self) -> None:
-        locations = [
-            {"lat": 33.0 + i * 0.1, "lon": -7.0 - i * 0.1}
-            for i in range(3)
-        ]
+        locations = [{"lat": 33.0 + i * 0.1, "lon": -7.0 - i * 0.1} for i in range(3)]
         r = client.post("/api/v1/scores/batch", json={"locations": locations})
         assert r.status_code == 200
         results = r.json()["results"]

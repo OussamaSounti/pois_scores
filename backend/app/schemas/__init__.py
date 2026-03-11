@@ -1,8 +1,8 @@
 from app.schemas.scores import (
     BatchScoresRequest,
     BatchScoresResponse,
-    LocationIn,
     LocationBatchItem,
+    LocationIn,
     LocationOut,
     ScoreResponse,
     ScoresPayload,

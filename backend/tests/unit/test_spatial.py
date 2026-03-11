@@ -1,9 +1,5 @@
 """Unit tests for spatial service (entropy, haversine)."""
 
-import math
-
-import pytest
-
 from app.services.spatial import _entropy, _haversine_km
 
 
