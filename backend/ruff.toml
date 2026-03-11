@@ -1,0 +1,10 @@
+# Ruff lint and format config
+target-version = "py311"
+line-length = 100
+exclude = ["__pycache__", ".pytest_cache", "*.egg-info"]
+
+[lint]
+select = ["E", "F", "I", "N", "W"]
+
+[format]
+quote-style = "double"
