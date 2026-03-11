@@ -325,6 +325,54 @@ body {
 
 .batch-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--panel); }
 .batch-input-section { padding: 16px; border-bottom: 1px solid var(--border); background: var(--panel2); }
+.batch-section-header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 6px; }
+.batch-section-header .section-label { margin-bottom: 0; }
+.batch-help-toggle {
+  font-family: var(--font-m);
+  font-size: 11px;
+  color: var(--blue);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 0;
+  text-decoration: underline;
+}
+.batch-help-toggle:hover { color: var(--accent); }
+.batch-help {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  font-size: 11px;
+  color: var(--text-mid);
+  line-height: 1.5;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.batch-help::-webkit-scrollbar { width: 4px; }
+.batch-help::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.batch-help-title {
+  font-family: var(--font-h);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 12px 0 6px;
+}
+.batch-help-title:first-child { margin-top: 0; }
+.batch-help-list { margin: 0 0 8px; padding-left: 18px; }
+.batch-help-list li { margin-bottom: 4px; }
+.batch-help code {
+  font-family: var(--font-m);
+  font-size: 10px;
+  background: var(--panel2);
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+.batch-help-limit { margin: 10px 0 0; font-size: 10px; color: var(--text-dim); }
 .batch-file-input { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
 .batch-dropzone {
   border: 2px dashed var(--border);
@@ -373,6 +421,7 @@ body {
 .batch-table th, .batch-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
 .batch-table th { font-family: var(--font-h); font-weight: 700; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); background: var(--panel2); }
 .batch-table tr:hover td { background: var(--panel2); }
+.batch-input-row-cell { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .error-banner { background: rgba(214,69,69,0.1); border: 1px solid #d64545; color: #c23636; padding: 12px 16px; border-radius: 6px; font-size: 12px; margin-bottom: 12px; }
 
