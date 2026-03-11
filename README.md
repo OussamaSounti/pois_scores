@@ -63,6 +63,26 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Set `DATABASE_URL` in `.env` at the project root (or export it) so the backend can connect to Postgres; the app loads `.env` from the current working directory when run from `backend/`.
 
+## Run tests
+
+From the `backend/` directory:
+
+```bash
+cd backend
+pip install -r requirements.txt
+pytest                    # all tests (integration skipped if DB down)
+pytest tests/unit -v      # unit only
+pytest --cov=app          # with coverage
+```
+Run integration tests (Postgres must be running and dump restored):
+```bash
+docker compose up -d db
+pytest tests/integration -v
+```
+
+- **Unit tests** (entropy, haversine): always run, no DB required.
+- **Integration tests** (API single + batch): run only when Postgres is up and the dump is restored; otherwise they are skipped. Use `pytest -v` for verbose output, `pytest --cov=app` for coverage.
+
 ## Environment variables
 
 | Variable        | Description                    | Example |
@@ -81,7 +101,6 @@ See `.env.example` for a template. Do not commit `.env`.
 
 ## Next steps
 
-- **Phase 2:** Batch endpoint, validation, tests
 - **Phase 3:** Backend in Docker, GitLab CI
 - **Phase 4:** Dashboard (single, batch, map)
 - **Phase 5:** Docs and polish
