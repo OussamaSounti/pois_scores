@@ -15,7 +15,9 @@ class LocationBatchItem(BaseModel):
 
     lat: float = Field(..., ge=-90, le=90, description="Latitude")
     lon: float = Field(..., ge=-180, le=180, description="Longitude")
-    id: str | int | None = Field(default=None, description="Optional client id for correlation in results")
+    id: str | int | None = Field(
+        default=None, description="Optional client id for correlation in results"
+    )
 
 
 class LocationOut(BaseModel):
@@ -81,4 +83,6 @@ class BatchScoresRequest(BaseModel):
 class BatchScoresResponse(BaseModel):
     """Batch score response; results in same order as request."""
 
-    results: list[ScoreResponse] = Field(..., description="One score result per input location, same order")
+    results: list[ScoreResponse] = Field(
+        ..., description="One score result per input location, same order"
+    )

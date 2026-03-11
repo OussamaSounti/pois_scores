@@ -5,6 +5,7 @@ import sys
 
 import psycopg2
 
+
 def main() -> int:
     url = os.environ.get("DATABASE_URL")
     if not url:

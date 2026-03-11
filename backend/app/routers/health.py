@@ -1,9 +1,8 @@
 """Health and readiness endpoints."""
 
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-
-from fastapi import APIRouter, Depends, HTTPException
 
 from app.db import get_db
 

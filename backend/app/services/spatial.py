@@ -9,21 +9,23 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 # Key fclass values for accessibility (within 400 m)
-ACCESSIBILITY_KEY_TYPES = frozenset({
-    "bus_stop",
-    "pharmacy",
-    "school",
-    "hospital",
-    "supermarket",
-    "bank",
-    "atm",
-    "clinic",
-    "fuel",
-    "police",
-    "park",
-    "doctors",
-    "taxi",
-})
+ACCESSIBILITY_KEY_TYPES = frozenset(
+    {
+        "bus_stop",
+        "pharmacy",
+        "school",
+        "hospital",
+        "supermarket",
+        "bank",
+        "atm",
+        "clinic",
+        "fuel",
+        "police",
+        "park",
+        "doctors",
+        "taxi",
+    }
+)
 
 
 @dataclass
@@ -71,13 +73,13 @@ def query_pois_radius(
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Distance in km between two WGS84 points."""
-    R = 6371.0  # Earth radius km
+    r = 6371.0  # Earth radius km
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
     dlam = math.radians(lon2 - lon1)
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
+    return r * c
 
 
 def _entropy(counts: dict[str, int], total: int) -> float:
@@ -101,9 +103,16 @@ def _nearest_km_by_category(
     """Min distance in km to nearest POI per super_category (PostGIS)."""
     sql = text("""
         SELECT super_category,
-               MIN(ST_Distance(geom::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography)) / 1000.0 AS dist_km
+               MIN(ST_Distance(
+                   geom::geography,
+                   ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
+               )) / 1000.0 AS dist_km
         FROM production.pois
-        WHERE ST_DWithin(geom::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :max_radius_m)
+        WHERE ST_DWithin(
+            geom::geography,
+            ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
+            :max_radius_m
+        )
         GROUP BY super_category
     """)
     rows = session.execute(
