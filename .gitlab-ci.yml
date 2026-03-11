@@ -1,0 +1,49 @@
+# Morocco Spatial Dashboard — CI: lint → test → build
+
+default:
+  image: python:3.12-slim
+
+stages:
+  - lint
+  - test
+  - build
+
+variables:
+  POSTGRES_DB: poi_db
+  POSTGRES_USER: poi_user
+  POSTGRES_PASSWORD: poi_password
+  DATABASE_URL: "postgresql://poi_user:poi_password@postgres:5432/poi_db"
+
+lint:
+  stage: lint
+  before_script:
+    - pip install ruff
+  script:
+    - ruff check backend/
+    - ruff format --check backend/
+
+test:
+  stage: test
+  services:
+    - name: postgis/postgis:15-3.5-alpine
+      alias: postgres
+  variables:
+    POSTGRES_HOST_AUTH_METHOD: trust
+  before_script:
+    - pip install -r backend/requirements.txt
+    - sleep 5
+    - python backend/scripts/run_init_schema_ci.py
+  script:
+    - cd backend && pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
+
+build:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  before_script:
+    - docker info
+  script:
+    - docker build -t morocco-spatial-dashboard-backend:${CI_COMMIT_SHORT_SHA} ./backend
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
