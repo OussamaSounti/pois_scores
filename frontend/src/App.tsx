@@ -43,20 +43,17 @@ export default function App() {
         </button>
       </div>
 
-      {tab === "single" ? (
-        <div className="main">
-          <SingleView
-            onCoordDisplayChange={(text, active) => {
-              setCoordText(text);
-              setHasLocation(active);
-            }}
-          />
-        </div>
-      ) : (
-        <div className="main">
-          <BatchView />
-        </div>
-      )}
+      <div className="main" style={{ display: tab === "single" ? "flex" : "none" }}>
+        <SingleView
+          onCoordDisplayChange={(text, active) => {
+            setCoordText(text);
+            setHasLocation(active);
+          }}
+        />
+      </div>
+      <div className="main" style={{ display: tab === "batch" ? "flex" : "none" }}>
+        <BatchView />
+      </div>
     </>
   );
 }
