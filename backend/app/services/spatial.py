@@ -71,6 +71,43 @@ def query_pois_radius(
     ]
 
 
+def get_pois_with_distance(
+    session: Session,
+    lat: float,
+    lon: float,
+    radius_m: float = 1000.0,
+) -> list[dict[str, Any]]:
+    """Return POIs within radius_m with distance_km for list/map display."""
+    radius_m = max(0, min(radius_m, 25_000))
+    sql = text("""
+        SELECT id, name, fclass, super_category, latitude, longitude,
+               ST_Distance(
+                   geom::geography,
+                   ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
+               ) / 1000.0 AS dist_km
+        FROM production.pois
+        WHERE ST_DWithin(
+            geom::geography,
+            ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
+            :radius_m
+        )
+        ORDER BY dist_km
+    """)
+    rows = session.execute(sql, {"lat": lat, "lon": lon, "radius_m": radius_m}).fetchall()
+    return [
+        {
+            "id": r.id,
+            "name": r.name or "Unnamed",
+            "fclass": r.fclass,
+            "super_category": r.super_category,
+            "latitude": float(r.latitude),
+            "longitude": float(r.longitude),
+            "distance_km": round(float(r.dist_km), 4),
+        }
+        for r in rows
+    ]
+
+
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Distance in km between two WGS84 points."""
     r = 6371.0  # Earth radius km
