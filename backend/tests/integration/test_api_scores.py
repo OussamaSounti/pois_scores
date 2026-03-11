@@ -62,6 +62,25 @@ class TestSingleScore:
 
 
 @pytest.mark.skipif(not _ready(), reason="Database not available")
+class TestPoisList:
+    def test_pois_list_ok(self) -> None:
+        r = client.get("/api/v1/pois", params={"lat": 33.5, "lon": -7.6})
+        assert r.status_code == 200
+        data = r.json()
+        assert "pois" in data
+        assert isinstance(data["pois"], list)
+        for p in data["pois"][:3]:
+            assert "id" in p and "name" in p and "fclass" in p
+            assert "super_category" in p and "latitude" in p and "longitude" in p
+            assert "distance_km" in p
+
+    def test_pois_radius_param(self) -> None:
+        r = client.get("/api/v1/pois", params={"lat": 33.5, "lon": -7.6, "radius_km": 0.5})
+        assert r.status_code == 200
+        assert "pois" in r.json()
+
+
+@pytest.mark.skipif(not _ready(), reason="Database not available")
 class TestBatchScores:
     def test_batch_two_locations(self) -> None:
         r = client.post(
