@@ -25,7 +25,7 @@ Use the `main` branch as default; use feature branches and Merge Requests for ch
 
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 - [Git](https://git-scm.com/)
-- (Later) Python 3.11+ for local backend runs
+- Python 3.11+ for running the backend
 
 ## Quick start (Phase 0)
 
@@ -47,6 +47,22 @@ Use the `main` branch as default; use feature branches and Merge Requests for ch
 4. **Document the schema**
    After restore, inspect tables in `psql` and record the actual table and column names in [docs/DATA_MODEL.md](docs/DATA_MODEL.md). The backend will use this to query POIs (no schema creation in code).
 
+## Run the API (Phase 1)
+
+With Postgres running and the dump restored:
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+- **API docs:** http://localhost:8000/docs  
+- **Single-location score:** GET or POST `/api/v1/scores` (query params or body `{"lat": 33.5, "lon": -7.6}`)  
+- **Health:** GET `/health`, GET `/ready`
+
+Set `DATABASE_URL` in `.env` at the project root (or export it) so the backend can connect to Postgres; the app loads `.env` from the current working directory when run from `backend/`.
+
 ## Environment variables
 
 | Variable        | Description                    | Example |
@@ -65,7 +81,6 @@ See `.env.example` for a template. Do not commit `.env`.
 
 ## Next steps
 
-- **Phase 1:** Backend API (FastAPI), single-location score endpoint, health checks
 - **Phase 2:** Batch endpoint, validation, tests
 - **Phase 3:** Backend in Docker, GitLab CI
 - **Phase 4:** Dashboard (single, batch, map)
