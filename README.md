@@ -68,6 +68,17 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Set `DATABASE_URL` in `.env` at the project root (or export it) so the backend can connect to Postgres; the app loads `.env` from the current working directory when run from `backend/`. When using **Docker Compose**, the backend container uses `DATABASE_URL` with host `db` (set in `docker-compose.yml`).
 
+## Run the dashboard (Phase 4)
+
+The dashboard is a React app that matches the prototype layout (left sidebar with coords + Run + metrics, center map, right panel). It uses **only** the backend score API (no separate POI list endpoint).
+
+1. Start the API: `docker compose up -d` or `cd backend && uvicorn app.main:app --reload --port 8000`.
+2. From project root: `cd frontend && npm install && npm run dev`. Open http://localhost:3000.
+3. **Single tab:** Enter coordinates and click Run, or double‑click the map. Metrics (overview, category density, accessibility 400 m, nearest by category) and the right-panel summary come from GET/POST `/api/v1/scores`. Hover over the **?** next to metric labels for explanations.
+4. **Batch tab:** Paste one `lat lon` or `lat,lon` per line, then Run batch. Results table is from POST `/api/v1/scores/batch`.
+
+To use a different API base URL, set `VITE_API_URL` in `frontend/.env` (e.g. `VITE_API_URL=http://localhost:8000`).
+
 ## Run tests
 
 From the `backend/` directory:
@@ -116,5 +127,4 @@ Ensure `.env` is not committed; CI uses its own variables and the Postgres servi
 
 ## Next steps
 
-- **Phase 4:** Dashboard (single, batch, map)
 - **Phase 5:** Docs and polish
