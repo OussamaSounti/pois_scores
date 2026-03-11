@@ -64,7 +64,7 @@ yarn-error.log*
 
 # Dump files (often large; keep out of repo unless small sample)
 *.dump
-*.sql
+data/*.sql
 
 # Logs and temp
 *.log
