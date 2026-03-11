@@ -12,7 +12,7 @@ docker compose ps   # ensure db is healthy
 Connection (from host): `postgresql://poi_user:poi_password@localhost:5432/poi_db`  
 Use the same user, password, and database name when restoring the dump.
 
-## Restore the colleague’s dump
+## Restore the POI dump
 
 The project **does not** create the POI schema via migrations. Schema and data come from a provided PostgreSQL dump (`.dump` or `.sql`). Restore it once after the first `docker compose up`.
 
