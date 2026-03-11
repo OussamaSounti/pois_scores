@@ -10,6 +10,14 @@ class LocationIn(BaseModel):
     lon: float = Field(..., ge=-180, le=180, description="Longitude")
 
 
+class LocationBatchItem(BaseModel):
+    """One location in a batch request; optional id for correlation."""
+
+    lat: float = Field(..., ge=-90, le=90, description="Latitude")
+    lon: float = Field(..., ge=-180, le=180, description="Longitude")
+    id: str | int | None = Field(default=None, description="Optional client id for correlation in results")
+
+
 class LocationOut(BaseModel):
     """Location in response."""
 
@@ -54,3 +62,23 @@ class ScoreResponse(BaseModel):
 
     location: LocationOut
     scores: ScoresPayload
+
+
+BATCH_MAX_LOCATIONS = 500
+
+
+class BatchScoresRequest(BaseModel):
+    """Request body for batch POI scores."""
+
+    locations: list[LocationBatchItem] = Field(
+        ...,
+        min_length=1,
+        max_length=BATCH_MAX_LOCATIONS,
+        description=f"List of locations (max {BATCH_MAX_LOCATIONS} per request)",
+    )
+
+
+class BatchScoresResponse(BaseModel):
+    """Batch score response; results in same order as request."""
+
+    results: list[ScoreResponse] = Field(..., description="One score result per input location, same order")
