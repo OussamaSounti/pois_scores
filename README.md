@@ -90,6 +90,10 @@ The dashboard is a React app: left sidebar (coords + Run + metrics), center map,
 
 Set `VITE_API_URL` in `frontend/.env` to point to another API base (e.g. `http://localhost:8000`).
 
+## Feature engineering pipeline
+
+An automated pipeline computes spatial indicators for every property in `production.properties` and writes them to `production.property_features` (direct ML input; no API calls). It reuses the same spatial logic as the API. Apply the pipeline schema once (see [docs/RUNBOOK.md](docs/RUNBOOK.md#feature-engineering-pipeline)), then run on demand or on a schedule (e.g. nightly): `docker compose run --rm pipeline`. When the POI database is refreshed monthly, the data team inserts a row into `production.poi_imports`; the next pipeline run then recomputes features for the entire portfolio. Each row in `property_features` stores `poi_refreshed_at` for reproducibility.
+
 ## Run tests
 
 From the `backend/` directory:
@@ -112,17 +116,18 @@ pytest tests/integration -v
 
 ## Environment variables
 
-| Variable        | Description                    | Example |
-|----------------|--------------------------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string   | `postgresql://poi_user:poi_password@localhost:5432/poi_db` |
-| `LOG_LEVEL`    | Log level (debug, info, etc.)  | `info`  |
-| `CORS_ORIGINS` | Allowed origins (comma-separated) | `http://localhost:3000` |
+| Variable           | Description                    | Example |
+|--------------------|--------------------------------|---------|
+| `DATABASE_URL`     | PostgreSQL connection string   | `postgresql://poi_user:poi_password@localhost:5432/poi_db` |
+| `LOG_LEVEL`        | Log level (debug, info, etc.)  | `info`  |
+| `CORS_ORIGINS`     | Allowed origins (comma-separated) | `http://localhost:3000` |
+| `PIPELINE_VERSION` | Version label written to property_features (pipeline only) | `1.0` |
 
 See `.env.example` for a template. Do not commit `.env`.
 
 ## Documentation
 
-- [docs/RUNBOOK.md](docs/RUNBOOK.md) — Restore dump, run Postgres, debug connection
+- [docs/RUNBOOK.md](docs/RUNBOOK.md) — Restore dump, run Postgres, pipeline schema and run, POI refresh
 - [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — POI table(s) and columns (from restored dump)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System context and data flow
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — Development and production-like deployment
