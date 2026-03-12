@@ -1,17 +1,17 @@
-"""Apply schema_feature_pipeline.sql (properties, poi_imports, property_features). Run once after dump restore."""
+"""Apply pipeline schema (properties, poi_imports, property_features). Run once after dump restore."""
 
 import os
 import sys
 from pathlib import Path
 
-# Ensure app package is importable (e.g. when run as python scripts/run_schema_feature_pipeline.py)
+# Ensure app package is importable when run as python scripts/run_schema_feature_pipeline.py
 _app_root = Path(__file__).resolve().parent.parent
 if str(_app_root) not in sys.path:
     sys.path.insert(0, str(_app_root))
 
-import psycopg2
+import psycopg2  # noqa: E402
 
-from app.config import get_settings
+from app.config import get_settings  # noqa: E402
 
 
 def main() -> int:
