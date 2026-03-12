@@ -19,7 +19,7 @@ git commit -m "chore: Phase 0 foundation — Docker Postgres, docs, env example"
 git push -u origin main
 ```
 
-Use the `main` branch as default; use feature branches and Merge Requests for changes.
+Use the `main` branch as default; use feature branches and Merge Requests for changes. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute.
 
 ## Prerequisites
 
@@ -127,10 +127,12 @@ See `.env.example` for a template. Do not commit `.env`.
 
 ## Documentation
 
+- [CHANGELOG.md](CHANGELOG.md) — Version history
 - [docs/RUNBOOK.md](docs/RUNBOOK.md) — Restore dump, run Postgres, pipeline schema and run, POI refresh
 - [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — POI table(s) and columns (from restored dump)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System context and data flow
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — Development and production-like deployment
+- [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) — Logging, health, metrics, and monitoring
 - [PROJECT_SPEC.md](PROJECT_SPEC.md) — Full project specification and phased plan
 
 ## CI/CD (GitLab)
