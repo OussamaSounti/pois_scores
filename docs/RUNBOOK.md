@@ -103,6 +103,8 @@ You can also run the SQL by hand: `psql $DATABASE_URL -f backend/scripts/schema_
 
 ### Run the pipeline
 
+The pipeline service is not started by default with `docker compose up -d`; run it on demand as below.
+
 **Manual (one-off):**
 ```bash
 docker compose run --rm pipeline
