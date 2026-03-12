@@ -77,3 +77,50 @@ Record the **actual** table and column names in [DATA_MODEL.md](DATA_MODEL.md) s
 - From host: `psql "postgresql://poi_user:poi_password@localhost:5432/poi_db"` (if `psql` is installed).
 - From another container on the same Compose network: use hostname `db`, port `5432`, and the same user/password/database.
 - Ensure `DATABASE_URL` in `.env` matches (user, password, host, port, database name).
+
+---
+
+## Feature engineering pipeline
+
+The pipeline computes spatial indicators for every property in `production.properties` and writes them to `production.property_features` (ML input). It reuses the same spatial logic as the API.
+
+### Apply pipeline schema (once)
+
+After the POI dump is restored, create the pipeline tables (`production.properties`, `production.poi_imports`, `production.property_features`):
+
+**From host:** The script uses the app config and loads `DATABASE_URL` from `.env` (in `backend/` or project root). If you don't use a `.env` file, set it in the shell first (e.g. `export DATABASE_URL="postgresql://poi_user:poi_password@localhost:5432/poi_db"` or PowerShell: `$env:DATABASE_URL="postgresql://..."`).
+```bash
+cd backend
+python scripts/run_schema_feature_pipeline.py
+```
+
+**Via Docker:** Rebuild the backend image first if you changed the Dockerfile (e.g. `docker compose build backend`), then:
+```bash
+docker compose run --rm backend python scripts/run_schema_feature_pipeline.py
+```
+
+You can also run the SQL by hand: `psql $DATABASE_URL -f backend/scripts/schema_feature_pipeline.sql`.
+
+### Run the pipeline
+
+**Manual (one-off):**
+```bash
+docker compose run --rm pipeline
+```
+
+**Scheduled (e.g. nightly at 2am):** Use host cron or your scheduler to run the same command, e.g.:
+```bash
+0 2 * * * cd /path/to/repo && docker compose run --rm pipeline
+```
+
+The pipeline processes only **pending** properties: those that do not yet have a row in `property_features` for the current POI version. After a POI refresh (see below), the next run will recompute the entire portfolio. It processes in chunks and commits after each chunk, so it can be restarted after an interruption and will continue from the remaining pending set.
+
+### POI refresh (monthly)
+
+When the data team imports new POI data (e.g. monthly), they must **insert one row** into `production.poi_imports` so the pipeline knows to recompute all property features:
+
+```sql
+INSERT INTO production.poi_imports (imported_at, label) VALUES (now(), '2025-03');
+```
+
+The pipeline uses `max(imported_at)` as the current POI version. Every row in `property_features` stores `poi_refreshed_at` so the ML team can trace which POI dataset produced each set of features.
