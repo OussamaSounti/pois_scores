@@ -419,7 +419,11 @@ function parseFileToLocations(file: File, text: string): FileParseResult {
   return out.locations.length ? out : { error: "No valid coordinates. Use .csv or .json file." };
 }
 
-export default function BatchView() {
+type BatchViewProps = {
+  onRowClick?: (lat: number, lon: number) => void;
+};
+
+export default function BatchView({ onRowClick }: BatchViewProps) {
   const [text, setText] = useState("");
   const [results, setResults] = useState<BatchResult | null>(null);
   const [rowMeta, setRowMeta] = useState<RowMeta[]>([]);
@@ -643,7 +647,15 @@ export default function BatchView() {
             </thead>
             <tbody>
               {results.map((r, i) => (
-                <tr key={i}>
+                <tr
+                  key={i}
+                  className={onRowClick ? "batch-result-row-clickable" : ""}
+                  role={onRowClick ? "button" : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  onClick={onRowClick ? () => onRowClick(r.location.lat, r.location.lon) : undefined}
+                  onKeyDown={onRowClick ? (e) => e.key === "Enter" && onRowClick(r.location.lat, r.location.lon) : undefined}
+                  title={onRowClick ? "Click to view this site in the Single tab" : undefined}
+                >
                   <td className="batch-input-row-cell">
                     {rowMeta.length === results.length && rowMeta[i] ? rowMeta[i].label : `Row ${i + 1}`}
                   </td>
