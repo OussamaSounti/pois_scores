@@ -12,7 +12,8 @@ RUN pip wheel --no-cache-dir --no-deps -w /wheels -r requirements.txt
 FROM python:3.12-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
-    PORT=8000
+    PORT=8000 \
+    PYTHONPATH=/app
 
 # Non-root user
 RUN adduser --disabled-password --gecos "" appuser
@@ -22,6 +23,7 @@ COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
 
 COPY app ./app
+COPY scripts ./scripts
 RUN chown -R appuser:appuser /app
 
 USER appuser
