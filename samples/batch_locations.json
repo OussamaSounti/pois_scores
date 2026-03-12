@@ -1,0 +1,5 @@
+[
+  { "lat": 33.595, "lon": -7.632, "id": "loc_1", "name": "Casablanca" },
+  { "lat": 34.02, "lon": -6.83, "id": "loc_2", "name": "Rabat" },
+  { "latitude": 31.63, "longitude": -7.99, "id": "loc_3", "name": "Marrakech" }
+]
