@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchPois, fetchScore, type PoiItem, type ScoreResponse } from "../api";
 import MapView from "./MapView";
 import MetricsPanel from "./MetricsPanel";
@@ -7,18 +7,50 @@ import RightPanel from "./RightPanel";
 const DEFAULT_LAT = 33.595;
 const DEFAULT_LON = -7.632;
 
+import type { PoiFilterItem } from "./MetricsPanel";
+
+function filterPoisByItem(
+  pois: PoiItem[],
+  filter: PoiFilterItem
+): PoiItem[] {
+  if (filter == null) return pois;
+  const { section, value } = filter;
+  switch (section) {
+    case "category_density":
+      return pois.filter((p) => p.super_category === value);
+    case "nearest": {
+      const inCategory = pois.filter((p) => p.super_category === value);
+      if (inCategory.length === 0) return [];
+      const minDist = Math.min(...inCategory.map((p) => p.distance_km));
+      return inCategory.filter((p) => p.distance_km <= minDist + 1e-9);
+    }
+    case "accessibility":
+      return pois.filter((p) => p.fclass === value);
+    default:
+      return pois;
+  }
+}
+
 type Props = {
+  pendingLocation?: { lat: number; lon: number } | null;
+  onConsumePendingLocation?: () => void;
   onCoordDisplayChange?: (text: string, hasLocation: boolean) => void;
 };
 
-export default function SingleView({ onCoordDisplayChange }: Props) {
+export default function SingleView({ pendingLocation, onConsumePendingLocation, onCoordDisplayChange }: Props) {
   const [lat, setLat] = useState(String(DEFAULT_LAT));
   const [lon, setLon] = useState(String(DEFAULT_LON));
   const [scoreData, setScoreData] = useState<ScoreResponse | null>(null);
   const [pois, setPois] = useState<PoiItem[]>([]);
   const [focusedPoiId, setFocusedPoiId] = useState<number | null>(null);
+  const [poiFilter, setPoiFilter] = useState<PoiFilterItem>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const filteredPois = useMemo(
+    () => filterPoisByItem(pois, poiFilter),
+    [pois, poiFilter]
+  );
 
   const center: [number, number] | null =
     scoreData != null
@@ -29,6 +61,7 @@ export default function SingleView({ onCoordDisplayChange }: Props) {
     setError(null);
     setLoading(true);
     setPois([]);
+    setPoiFilter(null);
     try {
       const res = await fetchScore(latVal, lonVal);
       setScoreData(res);
@@ -77,6 +110,13 @@ export default function SingleView({ onCoordDisplayChange }: Props) {
     }
   }, [scoreData, onCoordDisplayChange]);
 
+  useEffect(() => {
+    if (pendingLocation == null) return;
+    const { lat, lon } = pendingLocation;
+    runAnalysis(lat, lon);
+    onConsumePendingLocation?.();
+  }, [pendingLocation, onConsumePendingLocation, runAnalysis]);
+
   return (
     <>
       <div className="sidebar">
@@ -116,13 +156,22 @@ export default function SingleView({ onCoordDisplayChange }: Props) {
             {loading ? "Computing…" : "Run"}
           </button>
         </div>
-        <MetricsPanel data={scoreData} />
+        <MetricsPanel
+          data={scoreData}
+          activeFilter={poiFilter}
+          onItemClick={(section, value) =>
+            setPoiFilter((prev) =>
+              prev?.section === section && prev?.value === value ? null : { section, value }
+            )
+          }
+          onClearFilter={() => setPoiFilter(null)}
+        />
       </div>
 
       <div className="map-wrap" style={{ position: "relative", flex: 1, minHeight: 0 }}>
         <MapView
           center={center}
-          pois={pois}
+          pois={filteredPois}
           focusedPoiId={focusedPoiId}
           onFocusComplete={() => setFocusedPoiId(null)}
           onLocationSelect={handleMapLocation}
@@ -135,7 +184,7 @@ export default function SingleView({ onCoordDisplayChange }: Props) {
         )}
       </div>
 
-      <RightPanel data={scoreData} pois={pois} onPoiClick={setFocusedPoiId} />
+      <RightPanel data={scoreData} pois={filteredPois} onPoiClick={setFocusedPoiId} />
     </>
   );
 }
