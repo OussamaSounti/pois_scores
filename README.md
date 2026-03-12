@@ -70,14 +70,25 @@ Set `DATABASE_URL` in `.env` at the project root (or export it) so the backend c
 
 ## Run the dashboard (Phase 4)
 
-The dashboard is a React app that matches the prototype layout (left sidebar with coords + Run + metrics, center map, right panel). It uses **only** the backend score API (no separate POI list endpoint).
+The dashboard is a React app: left sidebar (coords + Run + metrics), center map, right panel (POI list). It calls the backend score API and the POI list endpoint.
 
 1. Start the API: `docker compose up -d` or `cd backend && uvicorn app.main:app --reload --port 8000`.
 2. From project root: `cd frontend && npm install && npm run dev`. Open http://localhost:3000.
-3. **Single tab:** Enter coordinates and click Run, or double‑click the map. Metrics (overview, category density, accessibility 400 m, nearest by category) and the right-panel summary come from GET/POST `/api/v1/scores`. Hover over the **?** next to metric labels for explanations.
-4. **Batch tab:** Paste one `lat lon` or `lat,lon` per line, then Run batch. Results table is from POST `/api/v1/scores/batch`.
 
-To use a different API base URL, set `VITE_API_URL` in `frontend/.env` (e.g. `VITE_API_URL=http://localhost:8000`).
+**Single tab**
+
+- Enter coordinates and click Run, or **double‑click** the map to analyze that location.
+- Metrics: overview (1 km / 400 m), category density, accessibility 400 m, nearest by category. Use **?** for explanations.
+- Map shows the location, 1 km / 400 m circles, and POIs; right panel lists POIs within 1 km. Click a POI in the list to focus it on the map.
+- **Filter by metric:** Click a **row** in "Category density", "Accessibility", or "Nearest · by category" to show only related POIs on the map and list. "Nearest" shows only the nearest POI per category. Use **Show all** to clear the filter.
+
+**Batch tab**
+
+- Paste coordinates (one `lat lon` or `lat,lon` per line), or **drag & drop** / choose a CSV or JSON file. Lat/lon columns are auto-detected; row labels (e.g. id, name) link results to your input.
+- Run batch → results table. **Click a row** to switch to the Single tab and view that site on the map.
+- **Export CSV** to download full scores (including `input_row` when loaded from a file).
+
+Set `VITE_API_URL` in `frontend/.env` to point to another API base (e.g. `http://localhost:8000`).
 
 ## Run tests
 
@@ -112,7 +123,9 @@ See `.env.example` for a template. Do not commit `.env`.
 ## Documentation
 
 - [docs/RUNBOOK.md](docs/RUNBOOK.md) — Restore dump, run Postgres, debug connection
-- [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — Actual POI table(s) and columns (fill after restore)
+- [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — POI table(s) and columns (from restored dump)
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System context and data flow
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — Development and production-like deployment
 - [PROJECT_SPEC.md](PROJECT_SPEC.md) — Full project specification and phased plan
 
 ## CI/CD (GitLab)
@@ -125,6 +138,13 @@ The pipeline (`.gitlab-ci.yml`) runs on push:
 
 Ensure `.env` is not committed; CI uses its own variables and the Postgres service.
 
-## Next steps
+## Project phases (complete)
 
-- **Phase 5:** Docs and polish
+| Phase | Deliverable |
+|-------|-------------|
+| 0 | Repo, Docker Postgres (PostGIS), env, runbook for dump restore |
+| 1 | Single-location score API, health/ready, OpenAPI |
+| 2 | Batch score API, validation, unit and integration tests |
+| 3 | Backend Dockerfile, docker-compose backend + db, GitLab CI (lint, test, build) |
+| 4 | Dashboard: Single tab (map, metrics, POI list, filters), Batch tab (file drop, CSV/JSON, export, row → Single) |
+| 5 | ARCHITECTURE.md, DEPLOYMENT.md, RUNBOOK and DATA_MODEL; real DB = `DATABASE_URL` only |
