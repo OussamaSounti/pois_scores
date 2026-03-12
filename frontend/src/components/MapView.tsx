@@ -6,7 +6,6 @@ import {
   Popup,
   TileLayer,
   useMap,
-  useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
 import type { PoiItem } from "../api";
@@ -27,17 +26,22 @@ function SetView({ center, zoom }: { center: [number, number]; zoom: number }) {
   return null;
 }
 
+/** Only double-click triggers analysis; single-click is ignored. Uses map.on('dblclick') so click never runs. */
 function DblClickHandler({
   onLocation,
 }: {
   onLocation: (lat: number, lon: number) => void;
 }) {
-  useMapEvents({
-    dblclick(e) {
-      e.originalEvent.preventDefault();
+  const map = useMap();
+  useEffect(() => {
+    const handler = (e: L.LeafletMouseEvent) => {
       onLocation(e.latlng.lat, e.latlng.lng);
-    },
-  });
+    };
+    map.on("dblclick", handler);
+    return () => {
+      map.off("dblclick", handler);
+    };
+  }, [map, onLocation]);
   return null;
 }
 
