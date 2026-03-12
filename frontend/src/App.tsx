@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import BatchView from "./components/BatchView";
 import SingleView from "./components/SingleView";
 
@@ -8,6 +8,12 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("single");
   const [coordText, setCoordText] = useState("No location selected");
   const [hasLocation, setHasLocation] = useState(false);
+  const [pendingSingleLocation, setPendingSingleLocation] = useState<{ lat: number; lon: number } | null>(null);
+
+  const goToSingleWithLocation = useCallback((lat: number, lon: number) => {
+    setPendingSingleLocation({ lat, lon });
+    setTab("single");
+  }, []);
 
   return (
     <>
@@ -45,6 +51,8 @@ export default function App() {
 
       <div className="main" style={{ display: tab === "single" ? "flex" : "none" }}>
         <SingleView
+          pendingLocation={pendingSingleLocation}
+          onConsumePendingLocation={() => setPendingSingleLocation(null)}
           onCoordDisplayChange={(text, active) => {
             setCoordText(text);
             setHasLocation(active);
@@ -52,7 +60,7 @@ export default function App() {
         />
       </div>
       <div className="main" style={{ display: tab === "batch" ? "flex" : "none" }}>
-        <BatchView />
+        <BatchView onRowClick={goToSingleWithLocation} />
       </div>
     </>
   );
