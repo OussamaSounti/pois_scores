@@ -89,3 +89,49 @@ Alternative POI table with geometry and address fields; not the main table for t
 For the score API, prefer **`production.pois`** and use either:
 - btree + app-side Haversine, or  
 - PostGIS on `geom` / `geom::geography` for “within radius” and distance, depending on backend choice.
+
+---
+
+## Feature pipeline tables (ML input)
+
+These tables are created by the feature engineering pipeline (see [RUNBOOK](RUNBOOK.md#feature-engineering-pipeline)). The pipeline reads from `production.properties` and `production.pois`, and writes to `production.property_features`.
+
+### `production.properties` (input)
+
+Portfolio of properties; each row is one location to score.
+
+| Column     | Type             | Description        |
+|------------|------------------|--------------------|
+| id         | bigint           | Primary key        |
+| latitude   | double precision | NOT NULL           |
+| longitude  | double precision | NOT NULL           |
+| metadata   | jsonb            | Optional metadata  |
+
+Populated by your ETL or admin process; the pipeline only reads from this table.
+
+### `production.poi_imports` (versioning)
+
+One row per POI data refresh. The pipeline uses `max(imported_at)` as the current POI version. The data team (or their import script) should insert a row here whenever they load new POI data.
+
+| Column      | Type      | Description                    |
+|-------------|-----------|--------------------------------|
+| id          | serial    | Primary key                    |
+| imported_at | timestamptz | When the POI dataset was loaded |
+| label       | text      | Optional label (e.g. '2025-03') |
+
+### `production.property_features` (output, ML input)
+
+One row per property; each column is a spatial indicator. The ML team reads this table (e.g. with `pandas.read_sql`) as the direct input to the property valuation model; no API calls needed.
+
+| Column            | Type      | Description |
+|-------------------|-----------|-------------|
+| property_id       | bigint    | PK, FK → properties(id) |
+| poi_refreshed_at  | timestamptz | POI version used to compute this row; **use for reproducibility** (e.g. train and evaluate on same version). |
+| pipeline_version  | text      | Version of the pipeline that wrote the row. |
+| computed_at       | timestamptz | When the row was computed. |
+| poi_count_1km, poi_count_400m, n_categories, n_poi_types, entropy, entropy_fclass, aggregate_score | scalars | Same as API score payload. |
+| acc_bus_stop, acc_pharmacy, … (14 booleans) | boolean | Accessibility flags within 400 m. |
+| by_category       | jsonb     | POI count per super_category (1 km). |
+| nearest_km        | jsonb     | Distance in km to nearest POI per super_category. |
+
+Index: `property_features(poi_refreshed_at)` for “pending” queries. When the POI dataset is refreshed, the pipeline recomputes all properties and overwrites rows (one row per property_id); `poi_refreshed_at` always records which POI import produced the features.
