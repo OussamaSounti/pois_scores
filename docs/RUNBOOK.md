@@ -1,6 +1,6 @@
 # Runbook — Morocco Spatial Dashboard
 
-Operations: starting the database, restoring the POI dump, and debugging.
+Operations: starting the database, restoring the POI dump, and debugging. POI data is loaded by restoring the provided PostgreSQL dump (see below); there is no separate CSV-import or migration for initial data.
 
 ## Start the database (local)
 
