@@ -1,0 +1,22 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "f1",
+      "properties": { "name": "Point A", "site": "S001" },
+      "geometry": { "type": "Point", "coordinates": [-7.632, 33.595] }
+    },
+    {
+      "type": "Feature",
+      "id": "f2",
+      "properties": { "name": "Point B", "site": "S002" },
+      "geometry": { "type": "Point", "coordinates": [-6.83, 34.02] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Point C" },
+      "geometry": { "type": "Point", "coordinates": [-7.99, 31.63] }
+    }
+  ]
+}
