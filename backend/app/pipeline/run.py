@@ -21,9 +21,7 @@ PIPELINE_VERSION = os.environ.get("PIPELINE_VERSION", "1.0")
 
 def _get_current_poi(session: Session) -> datetime:
     """Current POI version (max imported_at). If no row, use now() for this run."""
-    row = session.execute(
-        text("SELECT max(imported_at) FROM production.poi_imports")
-    ).scalar()
+    row = session.execute(text("SELECT max(imported_at) FROM production.poi_imports")).scalar()
     if row is not None:
         return row if row.tzinfo else row.replace(tzinfo=timezone.utc)
     return datetime.now(timezone.utc)
@@ -70,13 +68,32 @@ def _upsert_rows(session: Session, rows: list[dict[str, Any]]) -> None:
     # Build one upsert per row (could be batched with executemany + ON CONFLICT)
     # PostgreSQL: INSERT ... ON CONFLICT (property_id) DO UPDATE
     cols = [
-        "property_id", "poi_refreshed_at", "pipeline_version", "computed_at",
-        "poi_count_1km", "poi_count_400m", "n_categories", "n_poi_types",
-        "entropy", "entropy_fclass", "aggregate_score",
-        "acc_bus_stop", "acc_pharmacy", "acc_school", "acc_hospital",
-        "acc_supermarket", "acc_bank", "acc_atm", "acc_clinic", "acc_fuel",
-        "acc_police", "acc_park", "acc_doctors", "acc_taxi",
-        "by_category", "nearest_km",
+        "property_id",
+        "poi_refreshed_at",
+        "pipeline_version",
+        "computed_at",
+        "poi_count_1km",
+        "poi_count_400m",
+        "n_categories",
+        "n_poi_types",
+        "entropy",
+        "entropy_fclass",
+        "aggregate_score",
+        "acc_bus_stop",
+        "acc_pharmacy",
+        "acc_school",
+        "acc_hospital",
+        "acc_supermarket",
+        "acc_bank",
+        "acc_atm",
+        "acc_clinic",
+        "acc_fuel",
+        "acc_police",
+        "acc_park",
+        "acc_doctors",
+        "acc_taxi",
+        "by_category",
+        "nearest_km",
     ]
     placeholders = ", ".join(f":{c}" for c in cols)
     updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != "property_id")
@@ -105,7 +122,9 @@ def run_pipeline(chunk_size: int = CHUNK_SIZE) -> int:
         total_pending = _count_pending(session, current_poi)
         logger.info(
             "Pipeline starting: current_poi=%s, pending=%d, chunk_size=%d",
-            current_poi.isoformat(), total_pending, chunk_size,
+            current_poi.isoformat(),
+            total_pending,
+            chunk_size,
         )
         if total_pending == 0:
             logger.info("No pending properties; exiting.")
@@ -138,7 +157,9 @@ def run_pipeline(chunk_size: int = CHUNK_SIZE) -> int:
             elapsed = (datetime.now(timezone.utc) - start).total_seconds()
             logger.info(
                 "Chunk %d: processed %d properties in %.2fs",
-                chunk_index, len(rows), elapsed,
+                chunk_index,
+                len(rows),
+                elapsed,
             )
             offset += chunk_size
 
