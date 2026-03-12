@@ -1,6 +1,6 @@
 """Map compute_scores output to a flat row for property_features table."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from app.services.spatial import ACCESSIBILITY_KEY_TYPES
@@ -21,7 +21,7 @@ def score_dict_to_feature_row(
     Scalars and acc_* are flat; by_category and nearest_km become JSONB-ready dicts.
     """
     if computed_at is None:
-        computed_at = datetime.utcnow()
+        computed_at = datetime.now(timezone.utc)
     row: dict[str, Any] = {
         "property_id": property_id,
         "poi_refreshed_at": current_poi,
