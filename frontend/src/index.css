@@ -165,7 +165,35 @@ body {
 .empty-state .icon { font-size: 36px; opacity: 0.35; }
 .empty-state p { font-size: 11px; line-height: 1.7; }
 
+.metric-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  margin: 0 14px 8px;
+  background: rgba(41,194,92,0.1);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.metric-filter-label { font-size: 10px; color: var(--text-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.metric-filter-clear {
+  font-family: var(--font-h);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.metric-filter-clear:hover { text-decoration: underline; }
 .metric-group { padding: 14px 16px 4px; animation: fadeUp 0.4s ease both; }
+.metric-row-clickable { cursor: pointer; border-radius: 6px; transition: background 0.2s; }
+.metric-row-clickable:hover { background: var(--panel2); }
+.metric-row-active { background: rgba(41,194,92,0.12); box-shadow: 0 0 0 1px var(--accent); }
 .metric-group-title {
   font-family: var(--font-h);
   font-size: 9px;
@@ -421,6 +449,9 @@ body {
 .batch-table th, .batch-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
 .batch-table th { font-family: var(--font-h); font-weight: 700; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); background: var(--panel2); }
 .batch-table tr:hover td { background: var(--panel2); }
+.batch-result-row-clickable { cursor: pointer; }
+.batch-result-row-clickable:hover td { background: var(--panel2); }
+.batch-result-row-clickable:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
 .batch-input-row-cell { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .error-banner { background: rgba(214,69,69,0.1); border: 1px solid #d64545; color: #c23636; padding: 12px 16px; border-radius: 6px; font-size: 12px; margin-bottom: 12px; }
