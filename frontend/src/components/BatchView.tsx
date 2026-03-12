@@ -108,8 +108,8 @@ function parseLocations(text: string): Array<{ lat: number; lon: number }> {
     seenFirstLine.value = true;
     const numStrs = line.match(NUMBER_REGEX) ?? [];
     if (numStrs.length >= 2) {
-      const a = parseFloat(numStrs[0]);
-      const b = parseFloat(numStrs[1]);
+      const a = parseFloat(numStrs[0] ?? "");
+      const b = parseFloat(numStrs[1] ?? "");
       if (Number.isNaN(a) || Number.isNaN(b)) continue;
       const inLatRange = (n: number) => n >= -90 && n <= 90;
       const inLonRange = (n: number) => n >= -180 && n <= 180;
@@ -143,6 +143,12 @@ const inLatRange = (n: number) => n >= -90 && n <= 90;
 const inLonRange = (n: number) => n >= -180 && n <= 180;
 
 function parseCsvRow(line: string): string[] {
+  const trimmed = line.trim();
+  if (!trimmed) return [];
+  const hasCommaOrTab = /[\t,]/.test(trimmed);
+  if (!hasCommaOrTab) {
+    return trimmed.split(/\s+/).map((s) => s.trim()).filter(Boolean);
+  }
   const out: string[] = [];
   let cur = "";
   let inQuotes = false;
@@ -160,7 +166,8 @@ function parseCsvRow(line: string): string[] {
 
 /** Parse CSV with auto-detection of lat/lon columns by value ranges; returns locations and row labels for linking. */
 function parseLocationsFromCsv(csvText: string): { locations: LocationPair[]; rowMeta: RowMeta[] } {
-  const lines = csvText.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const trimmed = csvText.trimStart().replace(/^\uFEFF/, "");
+  const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const locations: LocationPair[] = [];
   const rowMeta: RowMeta[] = [];
   if (lines.length === 0) return { locations, rowMeta };
@@ -173,7 +180,7 @@ function parseLocationsFromCsv(csvText: string): { locations: LocationPair[]; ro
   const lonNames = ["lon", "lng", "longitude", "x"];
 
   function looksLikeHeader(cells: string[]): boolean {
-    return cells.every((c) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(c.trim()) || c.trim() === "");
+    return cells.every((c) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(c.trim().replace(/^\uFEFF/, "")) || c.trim() === "");
   }
 
   let startRow = 0;
@@ -209,6 +216,11 @@ function parseLocationsFromCsv(csvText: string): { locations: LocationPair[]; ro
     return inRange / vals.length;
   }
 
+  function looksLikeCoordColumn(colIdx: number): boolean {
+    const vals = columnNumericValues(colIdx);
+    return vals.some((v) => Math.abs(v) > 10 || String(v).includes("."));
+  }
+
   let latIdx = -1;
   let lonIdx = -1;
   for (let i = 0; i < nCols; i++) {
@@ -217,12 +229,13 @@ function parseLocationsFromCsv(csvText: string): { locations: LocationPair[]; ro
     const isLonName = lonNames.some((n) => h === n || h.startsWith(n + "_"));
     const slat = scoreLat(i);
     const slon = scoreLon(i);
+    const coordLike = looksLikeCoordColumn(i);
     if (isLatName && latIdx < 0) latIdx = i;
     else if (isLonName && lonIdx < 0) lonIdx = i;
-    if (latIdx < 0 && slat >= 0.8 && (lonIdx < 0 || i !== lonIdx)) {
+    if (latIdx < 0 && slat >= 0.8 && (lonIdx < 0 || i !== lonIdx) && coordLike) {
       if (latIdx < 0 || slat > scoreLat(latIdx)) latIdx = i;
     }
-    if (lonIdx < 0 && slon >= 0.8 && (latIdx < 0 || i !== latIdx)) {
+    if (lonIdx < 0 && slon >= 0.8 && (latIdx < 0 || i !== latIdx) && coordLike) {
       if (lonIdx < 0 || slon > scoreLon(lonIdx)) lonIdx = i;
     }
   }
@@ -232,21 +245,52 @@ function parseLocationsFromCsv(csvText: string): { locations: LocationPair[]; ro
       const vals = columnNumericValues(i);
       if (vals.length >= numRows * 0.5) numericCols.push(i);
     }
-    if (latIdx < 0 && numericCols[0] != null) latIdx = numericCols[0];
-    if (lonIdx < 0 && numericCols[1] != null) lonIdx = numericCols[1];
-    if (latIdx === lonIdx && numericCols.length > 1) lonIdx = numericCols[1];
+    const coordLikeCols = numericCols.filter((i) => looksLikeCoordColumn(i));
+    const fallbackCols = coordLikeCols.length >= 2 ? coordLikeCols : numericCols;
+    if (latIdx < 0 && fallbackCols[0] != null) latIdx = fallbackCols[0];
+    if (lonIdx < 0 && fallbackCols[1] != null) lonIdx = fallbackCols[1];
+    if (latIdx === lonIdx && fallbackCols.length > 1) lonIdx = fallbackCols[1];
   }
   if (latIdx < 0) latIdx = 0;
   if (lonIdx < 0) lonIdx = 1;
   if (latIdx === lonIdx) lonIdx = latIdx === 0 ? 1 : 0;
 
+  if (latIdx >= 0 && lonIdx >= 0 && latIdx !== lonIdx) {
+    const latColLooksLikeLon = scoreLon(latIdx) >= 0.8 && scoreLat(latIdx) < scoreLon(latIdx);
+    const lonColLooksLikeLat = scoreLat(lonIdx) >= 0.8 && scoreLon(lonIdx) < scoreLat(lonIdx);
+    if (latColLooksLikeLon && lonColLooksLikeLat) {
+      [latIdx, lonIdx] = [lonIdx, latIdx];
+    } else {
+      const latVals = columnNumericValues(latIdx);
+      const lonVals = columnNumericValues(lonIdx);
+      const latAllNegative = latVals.length > 0 && latVals.every((v) => v < 0);
+      const lonAllPositive = lonVals.length > 0 && lonVals.every((v) => v > 0);
+      if (latAllNegative && lonAllPositive) {
+        [latIdx, lonIdx] = [lonIdx, latIdx];
+      }
+    }
+  }
+
   let labelCol = -1;
+  const idLikeNames = ["id", "site_id", "location_id", "point_id", "site"];
   for (let i = 0; i < nCols; i++) {
     if (i !== latIdx && i !== lonIdx) {
       const h = (headerLower[i] ?? "").toLowerCase();
-      if (h === "id" || h === "name" || h === "label" || h.startsWith("id_") || h === "site") {
+      const isIdLike = h === "id" || h.endsWith("_id") || idLikeNames.includes(h);
+      if (isIdLike) {
         labelCol = i;
         break;
+      }
+    }
+  }
+  if (labelCol < 0) {
+    for (let i = 0; i < nCols; i++) {
+      if (i !== latIdx && i !== lonIdx) {
+        const h = (headerLower[i] ?? "").toLowerCase();
+        if (h === "name" || h === "label") {
+          labelCol = i;
+          break;
+        }
       }
     }
   }
