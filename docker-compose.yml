@@ -32,6 +32,8 @@ services:
         condition: service_healthy
 
   pipeline:
+    profiles:
+      - pipeline
     build:
       context: ./backend
       dockerfile: Dockerfile
