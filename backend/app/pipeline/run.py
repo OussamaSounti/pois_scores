@@ -29,7 +29,9 @@ def _get_current_poi(session: Session) -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _get_pending(session: Session, current_poi: datetime, limit: int, offset: int) -> list[tuple[int, float, float]]:
+def _get_pending(
+    session: Session, current_poi: datetime, limit: int, offset: int
+) -> list[tuple[int, float, float]]:
     """Properties that do not yet have a property_features row for current_poi."""
     sql = text("""
         SELECT p.id, p.latitude, p.longitude
