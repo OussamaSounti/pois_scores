@@ -34,7 +34,7 @@ test:
     - sleep 5
     - python backend/scripts/run_init_schema_ci.py
   script:
-    - cd backend && pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
+    - cd backend && pytest tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=70
 
 build:
   stage: build
