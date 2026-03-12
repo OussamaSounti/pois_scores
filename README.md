@@ -39,7 +39,7 @@ Use the `main` branch as default; use feature branches and Merge Requests for ch
    ```bash
    docker compose up -d
    ```
-   This starts Postgres and the backend API. Wait until both are up (`docker compose ps`). API: http://localhost:8000/docs
+   This starts the database and the backend API only (the pipeline service is not started by default; run it on demand with `docker compose run --rm pipeline`). Wait until both are up (`docker compose ps`). API: http://localhost:8000/docs
 
    To start only Postgres (e.g. to restore the dump first):
    ```bash
@@ -138,7 +138,7 @@ See `.env.example` for a template. Do not commit `.env`.
 The pipeline (`.gitlab-ci.yml`) runs on push:
 
 - **lint:** Ruff check and format on `backend/`
-- **test:** Postgres (PostGIS) service, init minimal schema, then `pytest` with coverage
+- **test:** Postgres (PostGIS) service, init minimal schema, then `pytest` with coverage; the job fails if coverage is below 70%
 - **build:** Docker build of the backend image (on the default branch)
 
 Ensure `.env` is not committed; CI uses its own variables and the Postgres service.
