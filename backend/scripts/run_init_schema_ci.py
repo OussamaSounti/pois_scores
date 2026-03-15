@@ -1,4 +1,4 @@
-"""Run init_schema_ci.sql against DATABASE_URL. Used in CI to create production.pois."""
+"""Run init_schema_ci.sql against DATABASE_URL. Used in CI to create production.pois_current."""
 
 import os
 import sys
