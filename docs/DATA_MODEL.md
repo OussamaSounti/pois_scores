@@ -4,97 +4,80 @@ The POI schema comes from the PostgreSQL dump. The backend **reads** these table
 
 ---
 
-## Main table for POI scores: `production.pois`
+## Main table for POI scores: `production.pois_current`
 
-All score endpoints (single location and batch) should query **`production.pois`**. This is the canonical POI table for the API.
+All score endpoints (single location and batch) should query **`production.pois_current`**. This is the canonical POI table for the API. The API uses only **active** rows (`is_active = true`).
 
-| Column          | Type             | Nullable | Default   | Description        |
-|-----------------|------------------|----------|-----------|--------------------|
-| id              | bigint           | NOT NULL | sequence  | Primary key        |
-| osm_id          | text             | YES      | —         | OpenStreetMap ID   |
-| name            | text             | NOT NULL | `'Unnamed'` | POI name        |
-| fclass          | text             | NOT NULL | —         | Fine class (e.g. bus_stop, pharmacy) |
-| super_category  | text             | NOT NULL | —         | Category (e.g. Transport, Healthcare) |
-| latitude        | double precision | NOT NULL | —         | Latitude           |
-| longitude       | double precision | NOT NULL | —         | Longitude          |
-| geom            | geometry         | —        | —         | PostGIS geometry (used in spatial indexes) |
+| Column             | Type             | Nullable | Default   | Description        |
+|--------------------|------------------|----------|-----------|--------------------|
+| id                 | bigint           | NOT NULL | sequence  | Primary key        |
+| osm_id             | text             | NOT NULL | —         | OpenStreetMap ID   |
+| name               | text             | NOT NULL | `'Unnamed'` | POI name        |
+| fclass             | text             | NOT NULL | —         | Fine class (e.g. bus_stop, pharmacy) |
+| super_category     | text             | NOT NULL | —         | Category (e.g. Transport, Healthcare) |
+| latitude           | double precision | NOT NULL | —         | Latitude           |
+| longitude          | double precision | NOT NULL | —         | Longitude          |
+| geom               | geometry         | —        | —         | PostGIS geometry (used in spatial indexes) |
+| content_hash       | text             | NOT NULL | —         | Hash for change detection |
+| first_seen_at      | timestamptz      | NOT NULL | now()     | First import time  |
+| last_seen_at       | timestamptz      | NOT NULL | now()     | Last seen time     |
+| updated_at         | timestamptz      | NOT NULL | now()     | Last update        |
+| is_active          | boolean          | NOT NULL | true      | Only active rows are used by the API |
+| source_snapshot_date | date           | YES      | —         | Snapshot date of source data |
 
 **Indexes**
 
 | Index                   | Type  | Definition                          |
 |-------------------------|-------|-------------------------------------|
-| idx_prod_coords         | btree | (latitude, longitude)               |
-| idx_prod_fclass         | —     | fclass                              |
+| idx_prod_content_hash   | btree | (content_hash)                       |
+| idx_prod_fclass         | btree | (fclass)                            |
 | idx_prod_geom           | gist  | (geom)                              |
-| idx_prod_geom_geog      | gist  | (geom::geography)                   |
-| idx_prod_name           | —     | name                                |
-| idx_prod_super_category | —     | super_category                      |
+| idx_prod_geom_geog       | gist  | (geom::geography)                   |
+| idx_prod_is_active      | btree | (is_active)                         |
+| idx_prod_name           | btree | (name)                              |
+| idx_prod_super_category | btree | (super_category)                    |
 
 Use `latitude` / `longitude` for simple distance or bbox logic; use `geom` (and the gist indexes) for PostGIS spatial queries (e.g. ST_DWithin, ST_Distance).
 
 ---
 
-## Other POI-related tables (reference)
+## Other schemas from the dump (reference)
 
-These live in the **`poi`** schema. The API is built on **`production.pois`**; the tables below are documented for context and possible future use.
+The dump also includes **audit**, **geo**, and **staging** schemas. The API is built on **`production.pois_current`**; the tables below are for context and pipeline/ETL use.
 
-### `poi.categories`
+### `audit` — pipeline runs and history
 
-Lookup table for category codes and names.
+- **audit.pipeline_runs**: run_id, run_timestamp, source_file, source_snapshot_date, pipeline_version, status, duration_seconds, notes
+- **audit.pois_history**: id, run_id, osm_id, change_type, name, fclass, super_category, latitude, longitude, geom, content_hash, valid_from, valid_to
+- **audit.run_stats**: run_id, total_raw, total_after_filter, inserted, updated, deactivated, reactivated, unchanged
 
-| Column       | Type        | Nullable | Default | Description   |
-|--------------|-------------|----------|---------|---------------|
-| id           | integer     | NOT NULL | —       | Primary key   |
-| code         | varchar(50) | NOT NULL | —       | Category code |
-| name         | varchar(100)| NOT NULL | —       | Display name  |
-| parent_code  | varchar(50) | YES      | —       | FK → poi.categories(code) |
-| description  | text        | YES      | —       |               |
-| created_at   | timestamptz | YES      | now()   |               |
+### `geo`
 
-**Relationship:** `parent_code` → `poi.categories(code)` (self-reference). Referenced by `poi.points_of_interest(category_code)`.
+- **geo.city_polygons**: id, name, fclass, geom (MultiPolygon)
 
-### `poi.points_of_interest`
+### `staging`
 
-Alternative POI table with geometry and address fields; not the main table for the score API.
-
-| Column         | Type               | Nullable | Default | Description   |
-|----------------|--------------------|----------|---------|---------------|
-| id             | bigint             | NOT NULL | —       | Primary key   |
-| osm_id         | varchar(20)        | YES      | —       |               |
-| name           | varchar(255)       | YES      | —       |               |
-| category_code  | varchar(50)        | YES      | —       | FK → poi.categories(code) |
-| geom           | geometry(Point,4326)| NOT NULL | —       | PostGIS point |
-| address        | text               | YES      | —       |               |
-| city           | varchar(100)       | YES      | —       |               |
-| province       | varchar(100)       | YES      | —       |               |
-| region         | varchar(100)       | YES      | —       |               |
-| tags           | jsonb              | YES      | '{}'    |               |
-| source         | varchar(50)        | YES      | 'osm'   |               |
-| created_at     | timestamptz        | YES      | —       |               |
-| updated_at     | timestamptz        | YES      | —       |               |
-
-**Indexes:** idx_poi_category, idx_poi_city, idx_poi_geom gist (geom), idx_poi_name_trgm, idx_poi_tags.
-
-**Relationship:** `category_code` → `poi.categories(code)`.
+- **staging.pois_stage**: osm_id, name, fclass, super_category, latitude, longitude, geom, content_hash
+- **staging.raw_pois**: osm_id, name, fclass, latitude, longitude, geom, source_layer
 
 ---
 
 ## Spatial indexing
 
-- **`production.pois`** (main table for the API): has both **latitude** and **longitude** (double precision) and a PostGIS **geom** column. Indexes include:
-  - **btree** on `(latitude, longitude)` for bbox/distance-style queries.
+- **`production.pois_current`** (main table for the API): has both **latitude** and **longitude** (double precision) and a PostGIS **geom** column. Indexes include:
+  - **btree** on `is_active` (filter active POIs).
+  - **btree** on `fclass`, `name`, `super_category`, `content_hash`.
   - **gist** on `geom` and on `geom::geography` for PostGIS spatial queries (e.g. `ST_DWithin`, `ST_Distance`).
-- **`poi.points_of_interest`**: uses **geometry(Point, 4326)** in `geom` (not null), with a **gist** index on `geom` for spatial queries.
 
-For the score API, prefer **`production.pois`** and use either:
+For the score API, use **`production.pois_current`** with `is_active = true` and either:
 - btree + app-side Haversine, or  
-- PostGIS on `geom` / `geom::geography` for “within radius” and distance, depending on backend choice.
+- PostGIS on `geom` / `geom::geography` for “within radius” and distance.
 
 ---
 
 ## Feature pipeline tables (ML input)
 
-These tables are created by the feature engineering pipeline (see [RUNBOOK](RUNBOOK.md#feature-engineering-pipeline)). The pipeline reads from `production.properties` and `production.pois`, and writes to `production.property_features`.
+These tables are **not** in the dump; they are created by the script [schema_feature_pipeline.sql](../backend/scripts/schema_feature_pipeline.sql) (see [RUNBOOK](RUNBOOK.md#feature-engineering-pipeline)). The pipeline reads from `production.properties` and **`production.pois_current`** (active POIs), and writes to `production.property_features`.
 
 ### `production.properties` (input)
 
@@ -113,11 +96,11 @@ Populated by your ETL or admin process; the pipeline only reads from this table.
 
 One row per POI data refresh. The pipeline uses `max(imported_at)` as the current POI version. The data team (or their import script) should insert a row here whenever they load new POI data.
 
-| Column      | Type      | Description                    |
-|-------------|-----------|--------------------------------|
-| id          | serial    | Primary key                    |
+| Column      | Type        | Description                    |
+|-------------|-------------|--------------------------------|
+| id          | serial      | Primary key                    |
 | imported_at | timestamptz | When the POI dataset was loaded |
-| label       | text      | Optional label (e.g. '2025-03') |
+| label       | text        | Optional label (e.g. '2025-03') |
 
 ### `production.property_features` (output, ML input)
 
