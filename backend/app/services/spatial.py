@@ -1,4 +1,4 @@
-"""Spatial queries and score computation for production.pois."""
+"""Spatial queries and score computation for production.pois_current."""
 
 import math
 from collections import defaultdict
@@ -30,7 +30,7 @@ ACCESSIBILITY_KEY_TYPES = frozenset(
 
 @dataclass
 class PoiRow:
-    """One POI row from production.pois (for in-memory use)."""
+    """One POI row from production.pois_current (for in-memory use)."""
 
     id: int
     name: str
@@ -46,12 +46,13 @@ def query_pois_radius(
     lon: float,
     radius_m: float,
 ) -> list[PoiRow]:
-    """Return POIs in production.pois within radius_m of (lat, lon). Uses PostGIS geom."""
+    """Return POIs in production.pois_current within radius_m of (lat, lon). Uses PostGIS geom. Only active POIs."""
     radius_m = max(0, min(radius_m, 100_000))
     sql = text("""
         SELECT id, name, fclass, super_category, latitude, longitude
-        FROM production.pois
-        WHERE ST_DWithin(
+        FROM production.pois_current
+        WHERE is_active = true
+          AND ST_DWithin(
             geom::geography,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
             :radius_m
@@ -77,7 +78,7 @@ def get_pois_with_distance(
     lon: float,
     radius_m: float = 1000.0,
 ) -> list[dict[str, Any]]:
-    """Return POIs within radius_m with distance_km for list/map display."""
+    """Return POIs within radius_m with distance_km for list/map display. Only active POIs."""
     radius_m = max(0, min(radius_m, 25_000))
     sql = text("""
         SELECT id, name, fclass, super_category, latitude, longitude,
@@ -85,8 +86,9 @@ def get_pois_with_distance(
                    geom::geography,
                    ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
                ) / 1000.0 AS dist_km
-        FROM production.pois
-        WHERE ST_DWithin(
+        FROM production.pois_current
+        WHERE is_active = true
+          AND ST_DWithin(
             geom::geography,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
             :radius_m
@@ -137,15 +139,16 @@ def _nearest_km_by_category(
     lon: float,
     max_radius_m: float = 25_000,
 ) -> dict[str, float]:
-    """Min distance in km to nearest POI per super_category (PostGIS)."""
+    """Min distance in km to nearest POI per super_category (PostGIS). Only active POIs."""
     sql = text("""
         SELECT super_category,
                MIN(ST_Distance(
                    geom::geography,
                    ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
                )) / 1000.0 AS dist_km
-        FROM production.pois
-        WHERE ST_DWithin(
+        FROM production.pois_current
+        WHERE is_active = true
+          AND ST_DWithin(
             geom::geography,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
             :max_radius_m
@@ -161,7 +164,7 @@ def _nearest_km_by_category(
 
 def compute_scores(session: Session, lat: float, lon: float) -> dict[str, Any]:
     """
-    Compute POI scores for one location from production.pois.
+    Compute POI scores for one location from production.pois_current (active POIs only).
     Returns a dict suitable for ScoresPayload (by_category, accessibility_400m, nearest_km, etc.).
     """
     pois_1km = query_pois_radius(session, lat, lon, 1000.0)
