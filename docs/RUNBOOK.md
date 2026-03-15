@@ -126,3 +126,31 @@ INSERT INTO production.poi_imports (imported_at, label) VALUES (now(), '2025-03'
 ```
 
 The pipeline uses `max(imported_at)` as the current POI version. Every row in `property_features` stores `poi_refreshed_at` so the ML team can trace which POI dataset produced each set of features.
+
+---
+
+## Verification checklist
+
+Before pushing or releasing, run these locally (see also [CONTRIBUTING.md](../CONTRIBUTING.md) and [.gitlab-ci.yml](../.gitlab-ci.yml)):
+
+| Check | Command |
+|-------|--------|
+| Backend lint | `ruff check backend/` |
+| Backend format | `ruff format --check backend/` |
+| Backend tests + coverage | `cd backend && pytest tests/ -v --cov=app --cov-fail-under=70` |
+| Frontend lint | `cd frontend && npm run lint` |
+| Frontend format | `cd frontend && npm run format:check` |
+| Frontend tests | `cd frontend && npm run test` |
+| Frontend build | `cd frontend && npm run build` |
+| Pre-commit (all files) | `pre-commit run --all-files` |
+
+All must pass for CI to succeed. Integration tests need Postgres with the schema (dump or `init_schema_ci.sql`).
+
+---
+
+## Schema change policy
+
+The current approach is **dump-first**: schema and data come from a restored PostgreSQL dump (and, in CI, from `init_schema_ci.sql`). There is no migration runner in the repo today.
+
+- **When Alembic (or similar) is adopted:** run a baseline revision that matches the current schema; then apply incremental migrations for future DDL changes. Initial load (dump restore) remains as documented above.
+- **Until then:** any schema change (new table, column, or index) requires either a **new dump** or **manual SQL**; update [DATA_MODEL.md](DATA_MODEL.md) and this runbook accordingly.
