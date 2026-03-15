@@ -1,45 +1,33 @@
-import { useEffect, useRef } from "react";
-import {
-  Circle,
-  MapContainer,
-  Marker,
-  Popup,
-  TileLayer,
-  useMap,
-} from "react-leaflet";
-import L from "leaflet";
-import type { PoiItem } from "../api";
-import { CAT_COLORS } from "../constants";
+import { useEffect, useRef } from 'react';
+import { Circle, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import type { PoiItem } from '../api';
+import { CAT_COLORS } from '../constants';
 
 const MOROCCO_CENTER: [number, number] = [31.7917, -7.0926];
 const MOROCCO_ZOOM = 6;
 const LOCATION_ZOOM = 15;
-const CARTO_URL =
-  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-const CARTO_ATTR = "© OpenStreetMap © Carto";
+const CARTO_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+const CARTO_ATTR = '© OpenStreetMap © Carto';
 
 function SetView({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap();
   useEffect(() => {
     map.setView(center, zoom);
-  }, [map, center[0], center[1], zoom]);
+  }, [map, center, zoom]);
   return null;
 }
 
 /** Only double-click triggers analysis; single-click is ignored. Uses map.on('dblclick') so click never runs. */
-function DblClickHandler({
-  onLocation,
-}: {
-  onLocation: (lat: number, lon: number) => void;
-}) {
+function DblClickHandler({ onLocation }: { onLocation: (lat: number, lon: number) => void }) {
   const map = useMap();
   useEffect(() => {
     const handler = (e: L.LeafletMouseEvent) => {
       onLocation(e.latlng.lat, e.latlng.lng);
     };
-    map.on("dblclick", handler);
+    map.on('dblclick', handler);
     return () => {
-      map.off("dblclick", handler);
+      map.off('dblclick', handler);
     };
   }, [map, onLocation]);
   return null;
@@ -48,7 +36,7 @@ function DblClickHandler({
 function CenterMarker({ lat, lon }: { lat: number; lon: number }) {
   const icon = L.divIcon({
     html: `<div style="width:14px;height:14px;border-radius:50%;background:#c2622a;border:2.5px solid #fff;box-shadow:0 2px 10px rgba(194,98,42,0.5)"></div>`,
-    className: "",
+    className: '',
     iconSize: [14, 14],
     iconAnchor: [7, 7],
   });
@@ -56,10 +44,10 @@ function CenterMarker({ lat, lon }: { lat: number; lon: number }) {
 }
 
 function poiIconForCategory(superCategory: string) {
-  const color = CAT_COLORS[superCategory] ?? "#8a93b2";
+  const color = CAT_COLORS[superCategory] ?? '#8a93b2';
   return L.divIcon({
     html: `<div style="width:9px;height:9px;border-radius:50%;background:${color};border:1.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.2)"></div>`,
-    className: "",
+    className: '',
     iconSize: [9, 9],
     iconAnchor: [4, 4],
   });
@@ -125,7 +113,7 @@ export default function MapView({
         <MapContainer
           center={mapCenter}
           zoom={mapZoom}
-          style={{ height: "100%", width: "100%", minHeight: 300 }}
+          style={{ height: '100%', width: '100%', minHeight: 300 }}
           zoomControl
           doubleClickZoom={false}
         >
@@ -138,20 +126,20 @@ export default function MapView({
                 center={center}
                 radius={1000}
                 pathOptions={{
-                  color: "#c2622a",
+                  color: '#c2622a',
                   weight: 1.5,
-                  fillColor: "#c2622a",
+                  fillColor: '#c2622a',
                   fillOpacity: 0.04,
-                  dashArray: "5 5",
+                  dashArray: '5 5',
                 }}
               />
               <Circle
                 center={center}
                 radius={400}
                 pathOptions={{
-                  color: "#1a7fa8",
+                  color: '#1a7fa8',
                   weight: 1.5,
-                  fillColor: "#1a7fa8",
+                  fillColor: '#1a7fa8',
                   fillOpacity: 0.07,
                 }}
               />

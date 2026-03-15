@@ -127,6 +127,8 @@ See `.env.example` for a template. Do not commit `.env`.
 
 ## Documentation
 
+- [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md) — Tech stack, coding and naming conventions, typing, testing, CI/CD, and security baseline
+- [docs/RELEASE_AND_DEPLOY.md](docs/RELEASE_AND_DEPLOY.md) — Branch flow, versioning, deployment, and rollback
 - [CHANGELOG.md](CHANGELOG.md) — Version history
 - [docs/RUNBOOK.md](docs/RUNBOOK.md) — Restore dump, run Postgres, pipeline schema and run, POI refresh
 - [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — POI table(s) and columns (from restored dump)

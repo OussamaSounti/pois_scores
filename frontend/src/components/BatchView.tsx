@@ -1,20 +1,20 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { fetchBatch, BATCH_MAX, type BatchResult, type ScoreResponse } from "../api";
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { fetchBatch, BATCH_MAX, type BatchResult, type ScoreResponse } from '../api';
 
 /** Build CSV string with full POI scores for each location (one row per location). Optionally prepend input_row from rowMeta. */
 function buildScoresCsv(results: BatchResult, rowMeta?: RowMeta[]): string {
-  if (results.length === 0) return "";
+  if (results.length === 0) return '';
 
   const scalarKeys = [
-    "lat",
-    "lon",
-    "poi_count_1km",
-    "poi_count_400m",
-    "n_categories",
-    "n_poi_types",
-    "entropy",
-    "entropy_fclass",
-    "aggregate_score",
+    'lat',
+    'lon',
+    'poi_count_1km',
+    'poi_count_400m',
+    'n_categories',
+    'n_poi_types',
+    'entropy',
+    'entropy_fclass',
+    'aggregate_score',
   ] as const;
 
   const allCatKeys = new Set<string>();
@@ -30,26 +30,25 @@ function buildScoresCsv(results: BatchResult, rowMeta?: RowMeta[]): string {
   const nearestKeys = [...allNearestKeys].sort();
 
   const escape = (v: string | number | boolean | null | undefined): string => {
-    const s = v === null || v === undefined ? "" : String(v);
+    const s = v === null || v === undefined ? '' : String(v);
     if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
     return s;
   };
 
   const hasInputRow = rowMeta != null && rowMeta.length === results.length;
-  const header =
-    [
-      ...(hasInputRow ? ["input_row"] : []),
-      "lat",
-      "lon",
-      ...scalarKeys.filter((k) => k !== "lat" && k !== "lon"),
-      ...catKeys.map((k) => `category_${k}`),
-      ...accKeys.map((k) => `acc_${k}`),
-      ...nearestKeys.map((k) => `nearest_km_${k}`),
-    ].join(",");
+  const header = [
+    ...(hasInputRow ? ['input_row'] : []),
+    'lat',
+    'lon',
+    ...scalarKeys.filter((k) => k !== 'lat' && k !== 'lon'),
+    ...catKeys.map((k) => `category_${k}`),
+    ...accKeys.map((k) => `acc_${k}`),
+    ...nearestKeys.map((k) => `nearest_km_${k}`),
+  ].join(',');
 
   const rows = results.map((r: ScoreResponse, i: number) => {
     const s = r.scores;
-    const inputRowCell = hasInputRow && rowMeta![i] ? escape(rowMeta![i].label) : "";
+    const inputRowCell = hasInputRow && rowMeta![i] ? escape(rowMeta![i].label) : '';
     const scalars: (string | number | null)[] = [
       r.location.lat,
       r.location.lon,
@@ -59,22 +58,22 @@ function buildScoresCsv(results: BatchResult, rowMeta?: RowMeta[]): string {
       s.n_poi_types,
       s.entropy,
       s.entropy_fclass,
-      s.aggregate_score ?? "",
+      s.aggregate_score ?? '',
     ];
-    const catVals = catKeys.map((k) => s.by_category?.[k] ?? "");
-    const accVals = accKeys.map((k) => (s.accessibility_400m?.[k] ? "1" : "0"));
-    const nearestVals = nearestKeys.map((k) => s.nearest_km?.[k] ?? "");
-    const rest = [...scalars, ...catVals, ...accVals, ...nearestVals].map(escape).join(",");
+    const catVals = catKeys.map((k) => s.by_category?.[k] ?? '');
+    const accVals = accKeys.map((k) => (s.accessibility_400m?.[k] ? '1' : '0'));
+    const nearestVals = nearestKeys.map((k) => s.nearest_km?.[k] ?? '');
+    const rest = [...scalars, ...catVals, ...accVals, ...nearestVals].map(escape).join(',');
     return hasInputRow ? `${inputRowCell},${rest}` : rest;
   });
 
-  return [header, ...rows].join("\r\n");
+  return [header, ...rows].join('\r\n');
 }
 
 function downloadCsv(csv: string, filename: string) {
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+  const a = document.createElement('a');
   a.href = url;
   a.download = filename;
   a.click();
@@ -87,9 +86,11 @@ const NUMBER_REGEX = /[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/g;
 function isHeaderLine(line: string): boolean {
   const lower = line.trim().toLowerCase();
   if (!lower) return false;
-  const headerWords = ["lat", "lon", "latitude", "longitude", "y", "x"];
+  const headerWords = ['lat', 'lon', 'latitude', 'longitude', 'y', 'x'];
   const tokens = lower.split(/[\s,\t;|]+/).filter(Boolean);
-  return tokens.length >= 2 && tokens.every((t) => headerWords.some((w) => t.startsWith(w) || t === w));
+  return (
+    tokens.length >= 2 && tokens.every((t) => headerWords.some((w) => t.startsWith(w) || t === w))
+  );
 }
 
 function parseLocations(text: string): Array<{ lat: number; lon: number }> {
@@ -97,7 +98,7 @@ function parseLocations(text: string): Array<{ lat: number; lon: number }> {
     .trim()
     .split(/\r?\n/)
     .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith("#") && !l.startsWith("//"));
+    .filter((l) => l && !l.startsWith('#') && !l.startsWith('//'));
   const out: Array<{ lat: number; lon: number }> = [];
   const seenFirstLine = { value: false };
   for (const line of lines) {
@@ -108,8 +109,8 @@ function parseLocations(text: string): Array<{ lat: number; lon: number }> {
     seenFirstLine.value = true;
     const numStrs = line.match(NUMBER_REGEX) ?? [];
     if (numStrs.length >= 2) {
-      const a = parseFloat(numStrs[0] ?? "");
-      const b = parseFloat(numStrs[1] ?? "");
+      const a = parseFloat(numStrs[0] ?? '');
+      const b = parseFloat(numStrs[1] ?? '');
       if (Number.isNaN(a) || Number.isNaN(b)) continue;
       const inLatRange = (n: number) => n >= -90 && n <= 90;
       const inLonRange = (n: number) => n >= -180 && n <= 180;
@@ -136,7 +137,7 @@ type LocationPair = { lat: number; lon: number };
 export type RowMeta = { id?: string; label: string };
 
 function locationsToText(locations: LocationPair[]): string {
-  return locations.map(({ lat, lon }) => `${lat} ${lon}`).join("\n");
+  return locations.map(({ lat, lon }) => `${lat} ${lon}`).join('\n');
 }
 
 const inLatRange = (n: number) => n >= -90 && n <= 90;
@@ -147,17 +148,20 @@ function parseCsvRow(line: string): string[] {
   if (!trimmed) return [];
   const hasCommaOrTab = /[\t,]/.test(trimmed);
   if (!hasCommaOrTab) {
-    return trimmed.split(/\s+/).map((s) => s.trim()).filter(Boolean);
+    return trimmed
+      .split(/\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   const out: string[] = [];
-  let cur = "";
+  let cur = '';
   let inQuotes = false;
   for (let i = 0; i < line.length; i++) {
     const c = line[i];
     if (c === '"') inQuotes = !inQuotes;
-    else if ((c === "," || c === "\t") && !inQuotes) {
+    else if ((c === ',' || c === '\t') && !inQuotes) {
       out.push(cur.trim());
-      cur = "";
+      cur = '';
     } else cur += c;
   }
   out.push(cur.trim());
@@ -166,8 +170,11 @@ function parseCsvRow(line: string): string[] {
 
 /** Parse CSV with auto-detection of lat/lon columns by value ranges; returns locations and row labels for linking. */
 function parseLocationsFromCsv(csvText: string): { locations: LocationPair[]; rowMeta: RowMeta[] } {
-  const trimmed = csvText.trimStart().replace(/^\uFEFF/, "");
-  const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const trimmed = csvText.trimStart().replace(/^\uFEFF/, '');
+  const lines = trimmed
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
   const locations: LocationPair[] = [];
   const rowMeta: RowMeta[] = [];
   if (lines.length === 0) return { locations, rowMeta };
@@ -176,11 +183,13 @@ function parseLocationsFromCsv(csvText: string): { locations: LocationPair[]; ro
   const nCols = Math.max(0, ...rows.map((r) => r.length));
   if (nCols < 2) return { locations, rowMeta };
 
-  const latNames = ["lat", "latitude", "y"];
-  const lonNames = ["lon", "lng", "longitude", "x"];
+  const latNames = ['lat', 'latitude', 'y'];
+  const lonNames = ['lon', 'lng', 'longitude', 'x'];
 
   function looksLikeHeader(cells: string[]): boolean {
-    return cells.every((c) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(c.trim().replace(/^\uFEFF/, "")) || c.trim() === "");
+    return cells.every(
+      (c) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(c.trim().replace(/^\uFEFF/, '')) || c.trim() === ''
+    );
   }
 
   let startRow = 0;
@@ -197,7 +206,7 @@ function parseLocationsFromCsv(csvText: string): { locations: LocationPair[]; ro
   function columnNumericValues(colIdx: number): number[] {
     const vals: number[] = [];
     for (const row of dataRows) {
-      const v = parseFloat((row[colIdx] ?? "").trim());
+      const v = parseFloat((row[colIdx] ?? '').trim());
       if (!Number.isNaN(v)) vals.push(v);
     }
     return vals;
@@ -218,15 +227,15 @@ function parseLocationsFromCsv(csvText: string): { locations: LocationPair[]; ro
 
   function looksLikeCoordColumn(colIdx: number): boolean {
     const vals = columnNumericValues(colIdx);
-    return vals.some((v) => Math.abs(v) > 10 || String(v).includes("."));
+    return vals.some((v) => Math.abs(v) > 10 || String(v).includes('.'));
   }
 
   let latIdx = -1;
   let lonIdx = -1;
   for (let i = 0; i < nCols; i++) {
-    const h = headerLower[i] ?? "";
-    const isLatName = latNames.some((n) => h === n || h.startsWith(n + "_"));
-    const isLonName = lonNames.some((n) => h === n || h.startsWith(n + "_"));
+    const h = headerLower[i] ?? '';
+    const isLatName = latNames.some((n) => h === n || h.startsWith(n + '_'));
+    const isLonName = lonNames.some((n) => h === n || h.startsWith(n + '_'));
     const slat = scoreLat(i);
     const slon = scoreLon(i);
     const coordLike = looksLikeCoordColumn(i);
@@ -272,11 +281,11 @@ function parseLocationsFromCsv(csvText: string): { locations: LocationPair[]; ro
   }
 
   let labelCol = -1;
-  const idLikeNames = ["id", "site_id", "location_id", "point_id", "site"];
+  const idLikeNames = ['id', 'site_id', 'location_id', 'point_id', 'site'];
   for (let i = 0; i < nCols; i++) {
     if (i !== latIdx && i !== lonIdx) {
-      const h = (headerLower[i] ?? "").toLowerCase();
-      const isIdLike = h === "id" || h.endsWith("_id") || idLikeNames.includes(h);
+      const h = (headerLower[i] ?? '').toLowerCase();
+      const isIdLike = h === 'id' || h.endsWith('_id') || idLikeNames.includes(h);
       if (isIdLike) {
         labelCol = i;
         break;
@@ -286,8 +295,8 @@ function parseLocationsFromCsv(csvText: string): { locations: LocationPair[]; ro
   if (labelCol < 0) {
     for (let i = 0; i < nCols; i++) {
       if (i !== latIdx && i !== lonIdx) {
-        const h = (headerLower[i] ?? "").toLowerCase();
-        if (h === "name" || h === "label") {
+        const h = (headerLower[i] ?? '').toLowerCase();
+        if (h === 'name' || h === 'label') {
           labelCol = i;
           break;
         }
@@ -295,13 +304,17 @@ function parseLocationsFromCsv(csvText: string): { locations: LocationPair[]; ro
     }
   }
   if (labelCol < 0) {
-    for (let i = 0; i < nCols; i++) if (i !== latIdx && i !== lonIdx) { labelCol = i; break; }
+    for (let i = 0; i < nCols; i++)
+      if (i !== latIdx && i !== lonIdx) {
+        labelCol = i;
+        break;
+      }
   }
 
   for (let r = 0; r < dataRows.length; r++) {
     const cells = dataRows[r];
-    const latVal = parseFloat((cells[latIdx] ?? "").trim());
-    const lonVal = parseFloat((cells[lonIdx] ?? "").trim());
+    const latVal = parseFloat((cells[latIdx] ?? '').trim());
+    const lonVal = parseFloat((cells[lonIdx] ?? '').trim());
     if (Number.isNaN(latVal) || Number.isNaN(lonVal)) continue;
     let lat: number, lon: number;
     if (inLatRange(latVal) && inLonRange(lonVal)) {
@@ -316,14 +329,17 @@ function parseLocationsFromCsv(csvText: string): { locations: LocationPair[]; ro
     }
     if (!inLatRange(lat) || !inLonRange(lon)) continue;
     locations.push({ lat, lon });
-    const label = labelCol >= 0 ? (cells[labelCol] ?? "").trim() : "";
+    const label = labelCol >= 0 ? (cells[labelCol] ?? '').trim() : '';
     rowMeta.push({ id: label || undefined, label: label || `Row ${locations.length}` });
   }
   return { locations, rowMeta };
 }
 
 /** Parse JSON; returns locations and rowMeta for linking results to input. */
-function parseLocationsFromJson(jsonText: string): { locations: LocationPair[]; rowMeta: RowMeta[] } {
+function parseLocationsFromJson(jsonText: string): {
+  locations: LocationPair[];
+  rowMeta: RowMeta[];
+} {
   const locations: LocationPair[] = [];
   const rowMeta: RowMeta[] = [];
   let data: unknown;
@@ -333,13 +349,13 @@ function parseLocationsFromJson(jsonText: string): { locations: LocationPair[]; 
     return { locations, rowMeta };
   }
   function labelFor(outputIndex: number, obj: Record<string, unknown> | null): string {
-    if (obj && typeof obj.id !== "undefined") return String(obj.id);
-    if (obj && typeof obj.name === "string") return obj.name;
-    if (obj && typeof obj === "object" && obj !== null && "properties" in obj) {
+    if (obj && typeof obj.id !== 'undefined') return String(obj.id);
+    if (obj && typeof obj.name === 'string') return obj.name;
+    if (obj && typeof obj === 'object' && obj !== null && 'properties' in obj) {
       const p = (obj as { properties?: Record<string, unknown> }).properties;
-      if (p && typeof p === "object") {
-        if (typeof p.id !== "undefined") return String(p.id);
-        if (typeof p.name === "string") return p.name;
+      if (p && typeof p === 'object') {
+        if (typeof p.id !== 'undefined') return String(p.id);
+        if (typeof p.name === 'string') return p.name;
       }
     }
     return `Row ${outputIndex + 1}`;
@@ -349,11 +365,12 @@ function parseLocationsFromJson(jsonText: string): { locations: LocationPair[]; 
       if (item == null) continue;
       let lat: number | undefined;
       let lon: number | undefined;
-      const obj = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : null;
-      if (obj && "lat" in item && "lon" in item) {
+      const obj =
+        typeof item === 'object' && item !== null ? (item as Record<string, unknown>) : null;
+      if (obj && 'lat' in item && 'lon' in item) {
         lat = Number((item as { lat: unknown }).lat);
         lon = Number((item as { lon: unknown }).lon);
-      } else if (obj && "latitude" in item && "longitude" in item) {
+      } else if (obj && 'latitude' in item && 'longitude' in item) {
         lat = Number((item as { latitude: unknown }).latitude);
         lon = Number((item as { longitude: unknown }).longitude);
       } else if (Array.isArray(item) && item.length >= 2) {
@@ -370,23 +387,36 @@ function parseLocationsFromJson(jsonText: string): { locations: LocationPair[]; 
           lon = b;
         }
       }
-      if (lat != null && lon != null && !Number.isNaN(lat) && !Number.isNaN(lon) && inLatRange(lat) && inLonRange(lon)) {
+      if (
+        lat != null &&
+        lon != null &&
+        !Number.isNaN(lat) &&
+        !Number.isNaN(lon) &&
+        inLatRange(lat) &&
+        inLonRange(lon)
+      ) {
         locations.push({ lat, lon });
         rowMeta.push({ label: labelFor(locations.length - 1, obj) });
       }
     }
     return { locations, rowMeta };
   }
-  if (typeof data === "object" && data != null && "features" in data) {
+  if (typeof data === 'object' && data != null && 'features' in data) {
     const features = (data as { features: unknown[] }).features;
     if (!Array.isArray(features)) return { locations, rowMeta };
     features.forEach((f, i) => {
-      if (f == null || typeof f !== "object" || !("geometry" in f)) return;
-      const geom = (f as { geometry: { type?: string; coordinates?: unknown[] }; id?: unknown; properties?: Record<string, unknown> }).geometry;
+      if (f == null || typeof f !== 'object' || !('geometry' in f)) return;
+      const geom = (
+        f as {
+          geometry: { type?: string; coordinates?: unknown[] };
+          id?: unknown;
+          properties?: Record<string, unknown>;
+        }
+      ).geometry;
       const feat = f as { id?: unknown; properties?: Record<string, unknown> };
       if (!geom || !Array.isArray(geom.coordinates)) return;
       const coords = geom.coordinates;
-      if (geom.type === "Point" && coords.length >= 2) {
+      if (geom.type === 'Point' && coords.length >= 2) {
         const lon = Number(coords[0]);
         const lat = Number(coords[1]);
         if (!Number.isNaN(lat) && !Number.isNaN(lon) && inLatRange(lat) && inLonRange(lon)) {
@@ -402,21 +432,21 @@ function parseLocationsFromJson(jsonText: string): { locations: LocationPair[]; 
 type FileParseResult = { locations: LocationPair[]; rowMeta: RowMeta[] } | { error: string };
 
 function parseFileToLocations(file: File, text: string): FileParseResult {
-  const name = (file.name || "").toLowerCase();
-  if (name.endsWith(".csv")) {
+  const name = (file.name || '').toLowerCase();
+  if (name.endsWith('.csv')) {
     const out = parseLocationsFromCsv(text);
-    return out.locations.length ? out : { error: "No valid coordinates found in CSV." };
+    return out.locations.length ? out : { error: 'No valid coordinates found in CSV.' };
   }
-  if (name.endsWith(".json") || name.endsWith(".geojson")) {
+  if (name.endsWith('.json') || name.endsWith('.geojson')) {
     const out = parseLocationsFromJson(text);
-    return out.locations.length ? out : { error: "No valid coordinates found in JSON." };
+    return out.locations.length ? out : { error: 'No valid coordinates found in JSON.' };
   }
-  if (text.trimStart().startsWith("[") || text.trimStart().startsWith("{")) {
+  if (text.trimStart().startsWith('[') || text.trimStart().startsWith('{')) {
     const out = parseLocationsFromJson(text);
-    return out.locations.length ? out : { error: "No valid coordinates in JSON." };
+    return out.locations.length ? out : { error: 'No valid coordinates in JSON.' };
   }
   const out = parseLocationsFromCsv(text);
-  return out.locations.length ? out : { error: "No valid coordinates. Use .csv or .json file." };
+  return out.locations.length ? out : { error: 'No valid coordinates. Use .csv or .json file.' };
 }
 
 type BatchViewProps = {
@@ -424,7 +454,7 @@ type BatchViewProps = {
 };
 
 export default function BatchView({ onRowClick }: BatchViewProps) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState('');
   const [results, setResults] = useState<BatchResult | null>(null);
   const [rowMeta, setRowMeta] = useState<RowMeta[]>([]);
   const [loading, setLoading] = useState(false);
@@ -436,7 +466,7 @@ export default function BatchView({ onRowClick }: BatchViewProps) {
   const handleRun = useCallback(async () => {
     const locations = parseLocations(text);
     if (locations.length === 0) {
-      setError("Enter at least one line with lat,lon (e.g. 33.595 -7.632).");
+      setError('Enter at least one line with lat,lon (e.g. 33.595 -7.632).');
       return;
     }
     if (locations.length > BATCH_MAX) {
@@ -449,7 +479,7 @@ export default function BatchView({ onRowClick }: BatchViewProps) {
       const data = await fetchBatch(locations);
       setResults(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Request failed");
+      setError(e instanceof Error ? e.message : 'Request failed');
     } finally {
       setLoading(false);
     }
@@ -466,7 +496,7 @@ export default function BatchView({ onRowClick }: BatchViewProps) {
 
   const handleFile = useCallback((file: File, fileText: string) => {
     const result = parseFileToLocations(file, fileText);
-    if ("error" in result) {
+    if ('error' in result) {
       setError(result.error);
       return;
     }
@@ -483,17 +513,17 @@ export default function BatchView({ onRowClick }: BatchViewProps) {
       if (!file) return;
       const reader = new FileReader();
       reader.onload = () => {
-        const fileText = typeof reader.result === "string" ? reader.result : "";
+        const fileText = typeof reader.result === 'string' ? reader.result : '';
         handleFile(file, fileText);
       };
-      reader.readAsText(file, "UTF-8");
+      reader.readAsText(file, 'UTF-8');
     },
     [handleFile]
   );
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
+    e.dataTransfer.dropEffect = 'copy';
     setDragOver(true);
   }, []);
 
@@ -508,11 +538,11 @@ export default function BatchView({ onRowClick }: BatchViewProps) {
       if (!file) return;
       const reader = new FileReader();
       reader.onload = () => {
-        const fileText = typeof reader.result === "string" ? reader.result : "";
+        const fileText = typeof reader.result === 'string' ? reader.result : '';
         handleFile(file, fileText);
       };
-      reader.readAsText(file, "UTF-8");
-      e.target.value = "";
+      reader.readAsText(file, 'UTF-8');
+      e.target.value = '';
     },
     [handleFile]
   );
@@ -528,51 +558,116 @@ export default function BatchView({ onRowClick }: BatchViewProps) {
             onClick={() => setShowBatchHelp((v) => !v)}
             aria-expanded={showBatchHelp}
           >
-            {showBatchHelp ? "Hide help" : "How does batch input work?"}
+            {showBatchHelp ? 'Hide help' : 'How does batch input work?'}
           </button>
         </div>
         <p className="batch-hint">
-          Paste coordinates or drag & drop CSV/JSON. Lat/lon columns are auto-detected; extra columns link results to your input rows. Max {BATCH_MAX} locations.
+          Paste coordinates or drag & drop CSV/JSON. Lat/lon columns are auto-detected; extra
+          columns link results to your input rows. Max {BATCH_MAX} locations.
         </p>
         {showBatchHelp && (
           <div className="batch-help" role="region" aria-label="Batch input help">
             <h4 className="batch-help-title">Ways to provide locations</h4>
             <ul className="batch-help-list">
-              <li><strong>Paste</strong> — Type or paste coordinates in the text area below (one location per line).</li>
-              <li><strong>Drag & drop</strong> — Drop a CSV or JSON file onto the drop zone; it will be parsed and the text area filled with the detected coordinates.</li>
-              <li><strong>Choose file</strong> — Click “or choose file” to pick a .csv or .json file from your computer.</li>
+              <li>
+                <strong>Paste</strong> — Type or paste coordinates in the text area below (one
+                location per line).
+              </li>
+              <li>
+                <strong>Drag & drop</strong> — Drop a CSV or JSON file onto the drop zone; it will
+                be parsed and the text area filled with the detected coordinates.
+              </li>
+              <li>
+                <strong>Choose file</strong> — Click “or choose file” to pick a .csv or .json file
+                from your computer.
+              </li>
             </ul>
 
             <h4 className="batch-help-title">Plain text (paste)</h4>
-            <p>One location per line. The first two numbers on each line are used as coordinates.</p>
+            <p>
+              One location per line. The first two numbers on each line are used as coordinates.
+            </p>
             <ul className="batch-help-list">
-              <li><strong>Order</strong> — Lat/lon or lon/lat is auto-detected from value ranges (latitude −90 to 90, longitude −180 to 180).</li>
-              <li><strong>Separators</strong> — Space, comma, tab, semicolon, or pipe between the two numbers.</li>
-              <li><strong>Comments</strong> — Lines starting with <code>#</code> or <code>//</code> are ignored.</li>
-              <li><strong>Header</strong> — If the first line looks like column names (e.g. <code>lat,lon</code>), it is skipped.</li>
-              <li>Extra numbers or text on the line are ignored; only the first two valid coordinates are used.</li>
+              <li>
+                <strong>Order</strong> — Lat/lon or lon/lat is auto-detected from value ranges
+                (latitude −90 to 90, longitude −180 to 180).
+              </li>
+              <li>
+                <strong>Separators</strong> — Space, comma, tab, semicolon, or pipe between the two
+                numbers.
+              </li>
+              <li>
+                <strong>Comments</strong> — Lines starting with <code>#</code> or{' '}
+                <code>{'//'}</code> are ignored.
+              </li>
+              <li>
+                <strong>Header</strong> — If the first line looks like column names (e.g.{' '}
+                <code>lat,lon</code>), it is skipped.
+              </li>
+              <li>
+                Extra numbers or text on the line are ignored; only the first two valid coordinates
+                are used.
+              </li>
             </ul>
 
             <h4 className="batch-help-title">CSV files</h4>
-            <p>Latitude and longitude columns are detected automatically so you can use files with many other columns.</p>
+            <p>
+              Latitude and longitude columns are detected automatically so you can use files with
+              many other columns.
+            </p>
             <ul className="batch-help-list">
-              <li><strong>Auto-detection</strong> — Columns whose values mostly fall in −90…90 (latitude) or −180…180 (longitude) are chosen. Header names like <code>lat</code>, <code>latitude</code>, <code>lon</code>, <code>longitude</code>, <code>x</code>, <code>y</code> are also used when present.</li>
-              <li><strong>Header row</strong> — If the first row looks like headers (letters/underscores only), it is skipped.</li>
-              <li><strong>Row labels</strong> — To link each result back to your file, the first column that is not lat/lon is used as the row label (e.g. site ID, name). Columns named <code>id</code>, <code>name</code>, <code>label</code>, or <code>site</code> are preferred. These labels appear in the “Input row” column of the results and in the exported CSV.</li>
+              <li>
+                <strong>Auto-detection</strong> — Columns whose values mostly fall in −90…90
+                (latitude) or −180…180 (longitude) are chosen. Header names like <code>lat</code>,{' '}
+                <code>latitude</code>, <code>lon</code>, <code>longitude</code>, <code>x</code>,{' '}
+                <code>y</code> are also used when present.
+              </li>
+              <li>
+                <strong>Header row</strong> — If the first row looks like headers
+                (letters/underscores only), it is skipped.
+              </li>
+              <li>
+                <strong>Row labels</strong> — To link each result back to your file, the first
+                column that is not lat/lon is used as the row label (e.g. site ID, name). Columns
+                named <code>id</code>, <code>name</code>, <code>label</code>, or <code>site</code>{' '}
+                are preferred. These labels appear in the “Input row” column of the results and in
+                the exported CSV.
+              </li>
             </ul>
 
             <h4 className="batch-help-title">JSON files</h4>
             <p>Arrays of coordinates or GeoJSON are supported.</p>
             <ul className="batch-help-list">
-              <li><strong>Array of objects</strong> — <code>{`[{ "lat": 33.5, "lon": -7.6 }, ...]`}</code> or <code>{`[{ "latitude", "longitude" }, ...]`}</code>. If objects have <code>id</code> or <code>name</code>, that value is used as the input row label.</li>
-              <li><strong>Array of arrays</strong> — <code>{`[[33.5, -7.6], ...]`}</code> (lat/lon or lon/lat is inferred).</li>
-              <li><strong>GeoJSON</strong> — <code>{`{ "type": "FeatureCollection", "features": [...] }`}</code> with Point geometries. <code>feature.id</code> or <code>properties.id</code> / <code>properties.name</code> are used as the row label when present.</li>
+              <li>
+                <strong>Array of objects</strong> —{' '}
+                <code>{`[{ "lat": 33.5, "lon": -7.6 }, ...]`}</code> or{' '}
+                <code>{`[{ "latitude", "longitude" }, ...]`}</code>. If objects have <code>id</code>{' '}
+                or <code>name</code>, that value is used as the input row label.
+              </li>
+              <li>
+                <strong>Array of arrays</strong> — <code>{`[[33.5, -7.6], ...]`}</code> (lat/lon or
+                lon/lat is inferred).
+              </li>
+              <li>
+                <strong>GeoJSON</strong> —{' '}
+                <code>{`{ "type": "FeatureCollection", "features": [...] }`}</code> with Point
+                geometries. <code>feature.id</code> or <code>properties.id</code> /{' '}
+                <code>properties.name</code> are used as the row label when present.
+              </li>
             </ul>
 
             <h4 className="batch-help-title">Results and export</h4>
             <ul className="batch-help-list">
-              <li>The <strong>Input row</strong> column in the results table shows the label from your file (or “Row 1”, “Row 2”, … if no label was found), so you can match each score to the correct line in your input.</li>
-              <li><strong>Export CSV</strong> includes all score fields. If you loaded from a file with row labels, the exported CSV also has an <code>input_row</code> column so you can join results back to your original data.</li>
+              <li>
+                The <strong>Input row</strong> column in the results table shows the label from your
+                file (or “Row 1”, “Row 2”, … if no label was found), so you can match each score to
+                the correct line in your input.
+              </li>
+              <li>
+                <strong>Export CSV</strong> includes all score fields. If you loaded from a file
+                with row labels, the exported CSV also has an <code>input_row</code> column so you
+                can join results back to your original data.
+              </li>
             </ul>
 
             <p className="batch-help-limit">Maximum {BATCH_MAX} locations per batch.</p>
@@ -587,7 +682,7 @@ export default function BatchView({ onRowClick }: BatchViewProps) {
           onChange={onFileInputChange}
         />
         <div
-          className={`batch-dropzone ${dragOver ? "batch-dropzone-active" : ""}`}
+          className={`batch-dropzone ${dragOver ? 'batch-dropzone-active' : ''}`}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
@@ -603,7 +698,9 @@ export default function BatchView({ onRowClick }: BatchViewProps) {
         </div>
         <textarea
           className="batch-textarea"
-          placeholder={"33.595 -7.632\n34.02,-6.83\n-7.65\t33.12\n# or drop a .csv / .json file above"}
+          placeholder={
+            '33.595 -7.632\n34.02,-6.83\n-7.65\t33.12\n# or drop a .csv / .json file above'
+          }
           value={text}
           onChange={(e) => {
             setText(e.target.value);
@@ -611,13 +708,8 @@ export default function BatchView({ onRowClick }: BatchViewProps) {
           }}
         />
         {error && <div className="error-banner">{error}</div>}
-        <button
-          type="button"
-          className="analyze-btn"
-          onClick={handleRun}
-          disabled={loading}
-        >
-          {loading ? "Computing…" : "Run batch"}
+        <button type="button" className="analyze-btn" onClick={handleRun} disabled={loading}>
+          {loading ? 'Computing…' : 'Run batch'}
         </button>
       </div>
       <div className="batch-results">
@@ -634,45 +726,49 @@ export default function BatchView({ onRowClick }: BatchViewProps) {
               </button>
             </div>
             <table className="batch-table">
-            <thead>
-              <tr>
-                <th>Input row</th>
-                <th>Lat</th>
-                <th>Lon</th>
-                <th>POIs 1 km</th>
-                <th>POIs 400 m</th>
-                <th>Categories</th>
-                <th>Aggregate</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((r, i) => (
-                <tr
-                  key={i}
-                  className={onRowClick ? "batch-result-row-clickable" : ""}
-                  role={onRowClick ? "button" : undefined}
-                  tabIndex={onRowClick ? 0 : undefined}
-                  onClick={onRowClick ? () => onRowClick(r.location.lat, r.location.lon) : undefined}
-                  onKeyDown={onRowClick ? (e) => e.key === "Enter" && onRowClick(r.location.lat, r.location.lon) : undefined}
-                  title={onRowClick ? "Click to view this site in the Single tab" : undefined}
-                >
-                  <td className="batch-input-row-cell">
-                    {rowMeta.length === results.length && rowMeta[i] ? rowMeta[i].label : `Row ${i + 1}`}
-                  </td>
-                  <td>{r.location.lat.toFixed(4)}</td>
-                  <td>{r.location.lon.toFixed(4)}</td>
-                  <td>{r.scores.poi_count_1km}</td>
-                  <td>{r.scores.poi_count_400m}</td>
-                  <td>{r.scores.n_categories}</td>
-                  <td>
-                    {r.scores.aggregate_score != null
-                      ? r.scores.aggregate_score
-                      : "—"}
-                  </td>
+              <thead>
+                <tr>
+                  <th>Input row</th>
+                  <th>Lat</th>
+                  <th>Lon</th>
+                  <th>POIs 1 km</th>
+                  <th>POIs 400 m</th>
+                  <th>Categories</th>
+                  <th>Aggregate</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {results.map((r, i) => (
+                  <tr
+                    key={i}
+                    className={onRowClick ? 'batch-result-row-clickable' : ''}
+                    role={onRowClick ? 'button' : undefined}
+                    tabIndex={onRowClick ? 0 : undefined}
+                    onClick={
+                      onRowClick ? () => onRowClick(r.location.lat, r.location.lon) : undefined
+                    }
+                    onKeyDown={
+                      onRowClick
+                        ? (e) => e.key === 'Enter' && onRowClick(r.location.lat, r.location.lon)
+                        : undefined
+                    }
+                    title={onRowClick ? 'Click to view this site in the Single tab' : undefined}
+                  >
+                    <td className="batch-input-row-cell">
+                      {rowMeta.length === results.length && rowMeta[i]
+                        ? rowMeta[i].label
+                        : `Row ${i + 1}`}
+                    </td>
+                    <td>{r.location.lat.toFixed(4)}</td>
+                    <td>{r.location.lon.toFixed(4)}</td>
+                    <td>{r.scores.poi_count_1km}</td>
+                    <td>{r.scores.poi_count_400m}</td>
+                    <td>{r.scores.n_categories}</td>
+                    <td>{r.scores.aggregate_score != null ? r.scores.aggregate_score : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </>
         )}
       </div>

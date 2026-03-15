@@ -1,27 +1,34 @@
 """Pydantic schemas for score API request/response."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LocationIn(BaseModel):
     """Single location input (lat, lon)."""
+
+    model_config = ConfigDict(extra="forbid")
 
     lat: float = Field(..., ge=-90, le=90, description="Latitude")
     lon: float = Field(..., ge=-180, le=180, description="Longitude")
 
 
 class LocationBatchItem(BaseModel):
-    """One location in a batch request; optional id for correlation."""
+    """One location in a batch request; optional id for client-side correlation only."""
+
+    model_config = ConfigDict(extra="forbid")
 
     lat: float = Field(..., ge=-90, le=90, description="Latitude")
     lon: float = Field(..., ge=-180, le=180, description="Longitude")
     id: str | int | None = Field(
-        default=None, description="Optional client id for correlation in results"
+        default=None,
+        description="Optional client id for correlation; not echoed (results in same order)",
     )
 
 
 class LocationOut(BaseModel):
     """Location in response."""
+
+    model_config = ConfigDict(extra="ignore")
 
     lat: float
     lon: float
@@ -29,6 +36,8 @@ class LocationOut(BaseModel):
 
 class ScoresPayload(BaseModel):
     """Scores object per location (density, diversity, accessibility, nearest)."""
+
+    model_config = ConfigDict(extra="ignore")
 
     poi_count_1km: int = Field(..., description="Number of POIs within 1 km")
     poi_count_400m: int = Field(..., description="Number of POIs within 400 m")
@@ -62,6 +71,8 @@ class ScoresPayload(BaseModel):
 class ScoreResponse(BaseModel):
     """Single-location score response."""
 
+    model_config = ConfigDict(extra="ignore")
+
     location: LocationOut
     scores: ScoresPayload
 
@@ -71,6 +82,8 @@ BATCH_MAX_LOCATIONS = 500
 
 class BatchScoresRequest(BaseModel):
     """Request body for batch POI scores."""
+
+    model_config = ConfigDict(extra="forbid")
 
     locations: list[LocationBatchItem] = Field(
         ...,
@@ -82,6 +95,8 @@ class BatchScoresRequest(BaseModel):
 
 class BatchScoresResponse(BaseModel):
     """Batch score response; results in same order as request."""
+
+    model_config = ConfigDict(extra="ignore")
 
     results: list[ScoreResponse] = Field(
         ..., description="One score result per input location, same order"
