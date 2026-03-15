@@ -1,6 +1,8 @@
 """Single-location and batch POI score endpoints."""
 
-from fastapi import APIRouter, Depends, Query
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -14,6 +16,7 @@ from app.schemas.scores import (
 )
 from app.services.spatial import compute_scores
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/scores", tags=["scores"])
 
 
@@ -24,7 +27,14 @@ def get_score(
     db: Session = Depends(get_db),
 ) -> ScoreResponse:
     """Get POI scores for a single location (query params)."""
-    payload = compute_scores(db, lat, lon)
+    try:
+        payload = compute_scores(db, lat, lon)
+    except Exception as e:
+        logger.exception("Score computation failed for lat=%s lon=%s", lat, lon)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Score computation failed: {e!s}",
+        ) from e
     return ScoreResponse(
         location=LocationOut(lat=lat, lon=lon),
         scores=ScoresPayload(**payload),
@@ -37,7 +47,14 @@ def post_score(
     db: Session = Depends(get_db),
 ) -> ScoreResponse:
     """Get POI scores for a single location (JSON body)."""
-    payload = compute_scores(db, body.lat, body.lon)
+    try:
+        payload = compute_scores(db, body.lat, body.lon)
+    except Exception as e:
+        logger.exception("Score computation failed for lat=%s lon=%s", body.lat, body.lon)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Score computation failed: {e!s}",
+        ) from e
     return ScoreResponse(
         location=LocationOut(lat=body.lat, lon=body.lon),
         scores=ScoresPayload(**payload),
@@ -52,7 +69,16 @@ def post_score_batch(
     """Get POI scores for multiple locations. Results in same order as input (max 500)."""
     results = []
     for loc in body.locations:
-        payload = compute_scores(db, loc.lat, loc.lon)
+        try:
+            payload = compute_scores(db, loc.lat, loc.lon)
+        except Exception as e:
+            logger.exception(
+                "Score computation failed for lat=%s lon=%s", loc.lat, loc.lon
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Score computation failed: {e!s}",
+            ) from e
         results.append(
             ScoreResponse(
                 location=LocationOut(lat=loc.lat, lon=loc.lon),
