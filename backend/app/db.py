@@ -3,15 +3,17 @@
 from collections.abc import Generator
 
 from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import get_settings
 
-_engine = None
-_SessionLocal = None
+_engine: Engine | None = None
+_SessionLocal: sessionmaker[Session] | None = None
 
 
-def get_engine():
+def get_engine() -> Engine:
+    """Return the shared SQLAlchemy engine; creates it on first call."""
     global _engine
     if _engine is None:
         settings = get_settings()
@@ -23,7 +25,8 @@ def get_engine():
     return _engine
 
 
-def get_session_factory():
+def get_session_factory() -> sessionmaker[Session]:
+    """Return the shared session factory; creates it on first call."""
     global _SessionLocal
     if _SessionLocal is None:
         _SessionLocal = sessionmaker(
