@@ -3,6 +3,8 @@
 Require Postgres with production.pois_current.
 """
 
+from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -62,6 +64,22 @@ class TestSingleScore:
     def test_invalid_coords_422(self) -> None:
         r = client.get("/api/v1/scores", params={"lat": 99, "lon": -7.6})
         assert r.status_code == 422
+
+    def test_get_scores_computation_error_500(self) -> None:
+        with patch("app.routers.scores.compute_scores") as mock_compute:
+            mock_compute.side_effect = RuntimeError("db unavailable")
+            r = client.get("/api/v1/scores", params={"lat": 33.5, "lon": -7.6})
+        assert r.status_code == 500
+        assert "Score computation failed" in r.json()["detail"]
+        assert "db unavailable" in r.json()["detail"]
+
+    def test_post_scores_computation_error_500(self) -> None:
+        with patch("app.routers.scores.compute_scores") as mock_compute:
+            mock_compute.side_effect = ValueError("invalid geom")
+            r = client.post("/api/v1/scores", json={"lat": 33.5, "lon": -7.6})
+        assert r.status_code == 500
+        assert "Score computation failed" in r.json()["detail"]
+        assert "invalid geom" in r.json()["detail"]
 
 
 @pytest.mark.skipif(not _ready(), reason="Database not available")
@@ -124,3 +142,14 @@ class TestBatchScores:
     def test_batch_empty_422(self) -> None:
         r = client.post("/api/v1/scores/batch", json={"locations": []})
         assert r.status_code == 422
+
+    def test_batch_computation_error_500(self) -> None:
+        with patch("app.routers.scores.compute_scores") as mock_compute:
+            mock_compute.side_effect = Exception("connection lost")
+            r = client.post(
+                "/api/v1/scores/batch",
+                json={"locations": [{"lat": 33.5, "lon": -7.6}]},
+            )
+        assert r.status_code == 500
+        assert "Score computation failed" in r.json()["detail"]
+        assert "connection lost" in r.json()["detail"]
