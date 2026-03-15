@@ -1,4 +1,4 @@
-# Morocco Spatial Dashboard — CI: lint → test → build
+# Morocco Spatial Dashboard — CI: lint (backend + frontend) → test → build
 
 default:
   image: python:3.12-slim
@@ -14,6 +14,7 @@ variables:
   POSTGRES_PASSWORD: poi_password
   DATABASE_URL: "postgresql://poi_user:poi_password@postgres:5432/poi_db"
 
+# --- Backend ---
 lint:
   stage: lint
   before_script:
@@ -47,3 +48,55 @@ build:
     - docker build -t morocco-spatial-dashboard-backend:${CI_COMMIT_SHORT_SHA} ./backend
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# --- Frontend ---
+frontend:lint:
+  stage: lint
+  image: node:20-alpine
+  cache:
+    key: frontend-${CI_COMMIT_REF_SLUG}
+    paths:
+      - frontend/node_modules
+  before_script:
+    - cd frontend && npm ci
+  script:
+    - cd frontend && npm run lint
+
+frontend:format:
+  stage: lint
+  image: node:20-alpine
+  cache:
+    key: frontend-${CI_COMMIT_REF_SLUG}
+    paths:
+      - frontend/node_modules
+  before_script:
+    - cd frontend && npm ci
+  script:
+    - cd frontend && npm run format:check
+
+frontend:test:
+  stage: test
+  image: node:20-alpine
+  cache:
+    key: frontend-${CI_COMMIT_REF_SLUG}
+    paths:
+      - frontend/node_modules
+  before_script:
+    - cd frontend && npm ci
+  script:
+    - cd frontend && npm run test
+
+frontend:build:
+  stage: build
+  image: node:20-alpine
+  cache:
+    key: frontend-${CI_COMMIT_REF_SLUG}
+    paths:
+      - frontend/node_modules
+  before_script:
+    - cd frontend && npm ci
+  script:
+    - cd frontend && npm run build
+  artifacts:
+    paths:
+      - frontend/dist
