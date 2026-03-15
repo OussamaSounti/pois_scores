@@ -60,7 +60,7 @@ frontend:lint:
   before_script:
     - cd frontend && npm ci
   script:
-    - cd frontend && npm run lint
+    - npm run lint
 
 frontend:format:
   stage: lint
@@ -72,7 +72,7 @@ frontend:format:
   before_script:
     - cd frontend && npm ci
   script:
-    - cd frontend && npm run format:check
+    - npm run format:check
 
 frontend:test:
   stage: test
@@ -84,7 +84,7 @@ frontend:test:
   before_script:
     - cd frontend && npm ci
   script:
-    - cd frontend && npm run test
+    - npm run test
 
 frontend:build:
   stage: build
@@ -96,7 +96,7 @@ frontend:build:
   before_script:
     - cd frontend && npm ci
   script:
-    - cd frontend && npm run build
+    - npm run build
   artifacts:
     paths:
       - frontend/dist
