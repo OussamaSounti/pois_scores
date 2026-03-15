@@ -72,9 +72,7 @@ def post_score_batch(
         try:
             payload = compute_scores(db, loc.lat, loc.lon)
         except Exception as e:
-            logger.exception(
-                "Score computation failed for lat=%s lon=%s", loc.lat, loc.lon
-            )
+            logger.exception("Score computation failed for lat=%s lon=%s", loc.lat, loc.lon)
             raise HTTPException(
                 status_code=500,
                 detail=f"Score computation failed: {e!s}",
