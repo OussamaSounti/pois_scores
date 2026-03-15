@@ -118,3 +118,14 @@ One row per property; each column is a spatial indicator. The ML team reads this
 | nearest_km        | jsonb     | Distance in km to nearest POI per super_category. |
 
 Index: `property_features(poi_refreshed_at)` for “pending” queries. When the POI dataset is refreshed, the pipeline recomputes all properties and overwrites rows (one row per property_id); `poi_refreshed_at` always records which POI import produced the features.
+
+---
+
+## Future migration strategy
+
+Today, schema and data are loaded from a **dump** (see [RUNBOOK](RUNBOOK.md#restore-the-poi-dump)); CI uses `init_schema_ci.sql` to create a minimal table set when no dump is present. For **future** schema changes (new tables, columns, or indexes), prefer one of:
+
+- **Versioned migrations** (e.g. Alembic): introduce a baseline revision matching the current state, then add incremental migrations. Initial data load remains dump + runbook; migrations apply only for DDL changes after the baseline.
+- **Documented process**: if migrations are not adopted, apply schema changes via a new dump or manual SQL, and update this doc and the runbook.
+
+Until a migration tool is in place, any schema change must be reflected in the dump or in `init_schema_ci.sql` and documented here.
