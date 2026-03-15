@@ -1,15 +1,15 @@
-import type { ScoreResponse } from "../api";
-import { ACC_META, CAT_ICONS, SCORE_TOOLTIPS } from "../constants";
-import Tooltip from "./Tooltip";
+import type { ScoreResponse } from '../api';
+import { ACC_META, CAT_ICONS, SCORE_TOOLTIPS } from '../constants';
+import Tooltip from './Tooltip';
 
-export type PoiFilterSection = "category_density" | "accessibility" | "nearest" | null;
+export type PoiFilterSection = 'category_density' | 'accessibility' | 'nearest' | null;
 
 export type PoiFilterItem = { section: PoiFilterSection; value: string } | null;
 
 type Props = {
   data: ScoreResponse | null;
   activeFilter?: PoiFilterItem;
-  onItemClick?: (section: "category_density" | "accessibility" | "nearest", value: string) => void;
+  onItemClick?: (section: 'category_density' | 'accessibility' | 'nearest', value: string) => void;
   onClearFilter?: () => void;
 };
 
@@ -20,8 +20,7 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
         <div className="empty-state">
           <div className="icon">📍</div>
           <p>
-            Double‑click the map or enter coordinates and click Run to compute
-            spatial indicators.
+            Double‑click the map or enter coordinates and click Run to compute spatial indicators.
           </p>
         </div>
       </div>
@@ -34,9 +33,9 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
   const nearest = Object.entries(s.nearest_km).sort((a, b) => a[1] - b[1]);
 
   const filterLabel =
-    activeFilter?.section === "accessibility"
-      ? ACC_META[activeFilter.value]?.label ?? activeFilter.value
-      : activeFilter?.value ?? "";
+    activeFilter?.section === 'accessibility'
+      ? (ACC_META[activeFilter.value]?.label ?? activeFilter.value)
+      : (activeFilter?.value ?? '');
 
   return (
     <div className="metrics-panel">
@@ -53,7 +52,7 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
           </button>
         </div>
       )}
-      <div className="metric-group" style={{ animationDelay: "0s" }}>
+      <div className="metric-group" style={{ animationDelay: '0s' }}>
         <div className="metric-group-title">Overview · 1 km radius</div>
         <div className="kpi-row">
           <div className="kpi-card">
@@ -120,7 +119,7 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
       </div>
 
       {byCat.length > 0 && (
-        <div className="metric-group" style={{ animationDelay: "0.07s" }}>
+        <div className="metric-group" style={{ animationDelay: '0.07s' }}>
           <div className="metric-group-title">
             Category density · 1 km
             <Tooltip text={SCORE_TOOLTIPS.by_category} />
@@ -128,21 +127,22 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
           {byCat.map(([cat, count]) => (
             <div
               key={cat}
-              className={`cat-row ${onItemClick ? "metric-row-clickable" : ""} ${activeFilter?.section === "category_density" && activeFilter?.value === cat ? "metric-row-active" : ""}`}
-              role={onItemClick ? "button" : undefined}
+              className={`cat-row ${onItemClick ? 'metric-row-clickable' : ''} ${activeFilter?.section === 'category_density' && activeFilter?.value === cat ? 'metric-row-active' : ''}`}
+              role={onItemClick ? 'button' : undefined}
               tabIndex={onItemClick ? 0 : undefined}
-              onClick={onItemClick ? () => onItemClick("category_density", cat) : undefined}
-              onKeyDown={onItemClick ? (e) => e.key === "Enter" && onItemClick("category_density", cat) : undefined}
+              onClick={onItemClick ? () => onItemClick('category_density', cat) : undefined}
+              onKeyDown={
+                onItemClick
+                  ? (e) => e.key === 'Enter' && onItemClick('category_density', cat)
+                  : undefined
+              }
               title={onItemClick ? `Click to show only ${cat} POIs on the map` : undefined}
             >
               <div className="cat-name">
-                {CAT_ICONS[cat] ?? "📍"} {cat}
+                {CAT_ICONS[cat] ?? '📍'} {cat}
               </div>
               <div className="cat-bar-wrap">
-                <div
-                  className="cat-bar"
-                  style={{ width: `${(count / maxD) * 100}%` }}
-                />
+                <div className="cat-bar" style={{ width: `${(count / maxD) * 100}%` }} />
               </div>
               <div className="cat-count">{count}</div>
             </div>
@@ -150,22 +150,26 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
         </div>
       )}
 
-      <div className="metric-group" style={{ animationDelay: "0.14s" }}>
+      <div className="metric-group" style={{ animationDelay: '0.14s' }}>
         <div className="metric-group-title">
           Accessibility · 400 m walk
           <Tooltip text={SCORE_TOOLTIPS.accessibility_400m} />
         </div>
         <div className="acc-grid">
           {Object.entries(s.accessibility_400m).map(([key, val]) => {
-            const meta = ACC_META[key] ?? { icon: "📍", label: key };
+            const meta = ACC_META[key] ?? { icon: '📍', label: key };
             return (
               <div
                 key={key}
-                className={`acc-item ${val ? "yes" : "no"} ${onItemClick ? "metric-row-clickable" : ""} ${activeFilter?.section === "accessibility" && activeFilter?.value === key ? "metric-row-active" : ""}`}
-                role={onItemClick ? "button" : undefined}
+                className={`acc-item ${val ? 'yes' : 'no'} ${onItemClick ? 'metric-row-clickable' : ''} ${activeFilter?.section === 'accessibility' && activeFilter?.value === key ? 'metric-row-active' : ''}`}
+                role={onItemClick ? 'button' : undefined}
                 tabIndex={onItemClick ? 0 : undefined}
-                onClick={onItemClick ? () => onItemClick("accessibility", key) : undefined}
-                onKeyDown={onItemClick ? (e) => e.key === "Enter" && onItemClick("accessibility", key) : undefined}
+                onClick={onItemClick ? () => onItemClick('accessibility', key) : undefined}
+                onKeyDown={
+                  onItemClick
+                    ? (e) => e.key === 'Enter' && onItemClick('accessibility', key)
+                    : undefined
+                }
                 title={onItemClick ? `Click to show only ${meta.label} POIs on the map` : key}
               >
                 <div className="acc-icon">{meta.icon}</div>
@@ -177,7 +181,7 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
       </div>
 
       {nearest.length > 0 && (
-        <div className="metric-group" style={{ animationDelay: "0.21s" }}>
+        <div className="metric-group" style={{ animationDelay: '0.21s' }}>
           <div className="metric-group-title">
             Nearest · by category
             <Tooltip text={SCORE_TOOLTIPS.nearest_km} />
@@ -185,15 +189,17 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
           {nearest.map(([cat, dist]) => (
             <div
               key={cat}
-              className={`nearest-row ${onItemClick ? "metric-row-clickable" : ""} ${activeFilter?.section === "nearest" && activeFilter?.value === cat ? "metric-row-active" : ""}`}
-              role={onItemClick ? "button" : undefined}
+              className={`nearest-row ${onItemClick ? 'metric-row-clickable' : ''} ${activeFilter?.section === 'nearest' && activeFilter?.value === cat ? 'metric-row-active' : ''}`}
+              role={onItemClick ? 'button' : undefined}
               tabIndex={onItemClick ? 0 : undefined}
-              onClick={onItemClick ? () => onItemClick("nearest", cat) : undefined}
-              onKeyDown={onItemClick ? (e) => e.key === "Enter" && onItemClick("nearest", cat) : undefined}
+              onClick={onItemClick ? () => onItemClick('nearest', cat) : undefined}
+              onKeyDown={
+                onItemClick ? (e) => e.key === 'Enter' && onItemClick('nearest', cat) : undefined
+              }
               title={onItemClick ? `Click to show only ${cat} POIs on the map` : undefined}
             >
               <div className="nearest-name">
-                {CAT_ICONS[cat] ?? "📍"} {cat}
+                {CAT_ICONS[cat] ?? '📍'} {cat}
               </div>
               <div className="nearest-dist">{dist} km</div>
             </div>
