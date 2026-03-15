@@ -1,11 +1,11 @@
 /** Backend API base. In dev we use relative /api so Vite proxy forwards to backend. */
 const API_BASE =
-  typeof import.meta.env?.VITE_API_URL === "string" &&
+  typeof import.meta.env?.VITE_API_URL === 'string' &&
   import.meta.env.VITE_API_URL.trim().length > 0
-    ? import.meta.env.VITE_API_URL.replace(/\/$/, "")
+    ? import.meta.env.VITE_API_URL.replace(/\/$/, '')
     : import.meta.env.DEV
-      ? ""
-      : "http://localhost:8000";
+      ? ''
+      : 'http://localhost:8000';
 
 export type ScoreResponse = {
   location: { lat: number; lon: number };
@@ -44,7 +44,7 @@ export async function fetchPois(
   const res = await fetch(
     `${API_BASE}/api/v1/pois?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&radius_km=${encodeURIComponent(radiusKm)}`
   );
-  if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+  if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
   const data = await res.json();
   return data.pois ?? [];
 }
@@ -53,7 +53,7 @@ export async function fetchScore(lat: number, lon: number): Promise<ScoreRespons
   const res = await fetch(
     `${API_BASE}/api/v1/scores?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`
   );
-  if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+  if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
   return res.json();
 }
 
@@ -61,11 +61,11 @@ export async function fetchBatch(
   locations: Array<{ lat: number; lon: number }>
 ): Promise<BatchResult> {
   const res = await fetch(`${API_BASE}/api/v1/scores/batch`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ locations }),
   });
-  if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+  if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
   const data = await res.json();
   return data.results ?? [];
 }
