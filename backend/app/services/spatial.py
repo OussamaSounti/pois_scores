@@ -46,7 +46,7 @@ def query_pois_radius(
     lon: float,
     radius_m: float,
 ) -> list[PoiRow]:
-    """Return POIs in production.pois_current within radius_m of (lat, lon). Uses PostGIS geom. Only active POIs."""
+    """Return active POIs in production.pois_current within radius_m. Uses PostGIS geom."""
     radius_m = max(0, min(radius_m, 100_000))
     sql = text("""
         SELECT id, name, fclass, super_category, latitude, longitude

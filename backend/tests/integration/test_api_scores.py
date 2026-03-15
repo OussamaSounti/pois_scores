@@ -1,4 +1,7 @@
-"""Integration tests for score API (single and batch). Require Postgres with production.pois_current."""
+"""Integration tests for score API (single and batch).
+
+Require Postgres with production.pois_current.
+"""
 
 import pytest
 from fastapi.testclient import TestClient
