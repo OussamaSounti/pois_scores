@@ -21,9 +21,7 @@ PIPELINE_VERSION = os.environ.get("PIPELINE_VERSION", "1.0")
 
 def _get_current_poi(session: Session) -> datetime:
     """Current POI version from audit.pipeline_runs (max run_timestamp). If no row, use now()."""
-    row = session.execute(
-        text("SELECT max(run_timestamp) FROM audit.pipeline_runs")
-    ).scalar()
+    row = session.execute(text("SELECT max(run_timestamp) FROM audit.pipeline_runs")).scalar()
     if row is not None:
         return row if row.tzinfo else row.replace(tzinfo=timezone.utc)
     return datetime.now(timezone.utc)
