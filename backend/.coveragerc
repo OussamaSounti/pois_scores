@@ -1,0 +1,11 @@
+[run]
+source = app
+omit =
+    app/orchestration/*
+    app/pipeline/__main__.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
