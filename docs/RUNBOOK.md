@@ -122,6 +122,137 @@ The pipeline processes only **pending** properties: those that do not yet have a
 
 ---
 
+## Prefect automation (local, cloud, production)
+
+This repo provides a Prefect flow at:
+
+- **File:** `backend/app/orchestration/prefect_feature_flow.py`
+- **Entrypoint:** `monthly_poi_feature_recompute_flow`
+
+The flow reads `max(audit.pipeline_runs.run_timestamp)` as the current external POI version and recomputes pending properties for that version.
+
+### Mode A - Local only (fastest setup)
+
+Use this to develop/debug quickly on your machine.
+
+1) Install dependencies:
+
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+2) Set environment for the current shell:
+
+```bash
+export DATABASE_URL="postgresql://..."
+export LOG_LEVEL="INFO"
+```
+
+PowerShell:
+
+```powershell
+$env:DATABASE_URL="postgresql://..."
+$env:LOG_LEVEL="INFO"
+```
+
+3) Run once:
+
+```bash
+python -m app.orchestration.prefect_feature_flow
+```
+
+4) Optional schedule from local process:
+
+```bash
+python -c "from app.orchestration.prefect_feature_flow import monthly_poi_feature_recompute_flow as f; f.serve(name='monthly-local-schedule', cron='0 2 1 * *', parameters={'chunk_size':200})"
+```
+
+Notes:
+
+- Keep the terminal alive while using `serve`.
+- In some Prefect versions, `Flow.serve()` does not accept `timezone=...`; set timezone in UI schedule settings.
+
+### Mode B - Prefect Cloud (private GitLab)
+
+Use this when you want schedule and run visibility in Prefect UI while keeping flow code in a private GitLab repository.
+
+1) Login:
+
+```bash
+prefect cloud login
+```
+
+2) Create/update variables (lowercase names required):
+
+```bash
+prefect variable set database_url "postgresql://..."
+prefect variable set log_level "INFO"
+```
+
+3) Create a managed pool:
+
+```bash
+prefect work-pool create pois-managed-pool --type prefect:managed
+```
+
+4) Configure private GitLab credentials for Prefect code pulls.
+
+Recommended approach:
+
+- Install integration: `pip install "prefect[gitlab]"`
+- Register blocks: `prefect block register -m prefect_gitlab`
+- Create a `GitLabCredentials` block with a token that has `read_repository` access to the target repo.
+- Use that block when deploying from source (for example, with `flow.from_source(...)` and a Git repository storage object).
+
+5) Deploy the flow and schedule it monthly (for example, day 1 at 02:00).
+
+- Source repository URL should be the private GitLab repo (`https://gitlab.com/<group>/<repo>.git`).
+- Set deployment environment variables from Prefect variables (for example, `DATABASE_URL` and `LOG_LEVEL`).
+
+6) Trigger and monitor:
+
+```bash
+prefect deployment run "monthly-poi-feature-recompute/monthly-poi-refresh"
+```
+
+In Prefect UI, verify:
+
+- Deployment is active and schedule is enabled.
+- Upcoming runs appear as `Scheduled`.
+- Flow run logs show successful pull from private GitLab and successful DB processing.
+
+### Mode C - Production pattern
+
+Use this for stable monthly operation linked to external POI refreshes.
+
+1) Database and network prerequisites:
+
+- `DATABASE_URL` points to production Postgres (not localhost).
+- DB contains `audit.pipeline_runs`, `production.properties`, and `production.property_features`.
+
+2) Source control and credentials:
+
+- If code is in a private GitLab repo, use secure Git credentials for Prefect pulls (for example, Prefect GitLab credentials block).
+- Avoid embedding plaintext tokens in commands.
+
+3) Deployment schedule:
+
+- Recommended: schedule monthly after expected external refresh window (for example, day 1 at 02:00).
+- Optional: trigger on external pipeline completion via CLI/API automation.
+
+4) Operational checks after each run:
+
+- Flow run state is `Completed`.
+- Pending count for latest `run_timestamp` is `0`.
+- Logs show processed rows and no retry storm.
+
+### External refresh trigger contract
+
+The recompute flow assumes the external POI pipeline writes a new row in `audit.pipeline_runs`. If that table is not updated, the flow may skip because it sees no new POI version.
+
+---
+
 ## Verification checklist
 
 Before pushing or releasing, run these locally (see also [CONTRIBUTING.md](../CONTRIBUTING.md) and [.gitlab-ci.yml](../.gitlab-ci.yml)):
