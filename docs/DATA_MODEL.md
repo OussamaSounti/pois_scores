@@ -1,6 +1,6 @@
-# Data model (from restored dump)
+# Data model
 
-The POI schema comes from the PostgreSQL dump. The backend **reads** these tables only; it does not create or alter them. Use this document to query the correct schema, table, and column names.
+Schema and data: **in production** from the existing database (refreshed by an external pipeline); **for local/dev** from a dump or from the minimal init script (`init_schema_ci.sql`). The backend **reads** these tables only; it does not create or alter the POI schema. Use this document to query the correct schema, table, and column names.
 
 ---
 
@@ -92,15 +92,7 @@ Portfolio of properties; each row is one location to score.
 
 Populated by your ETL or admin process; the pipeline only reads from this table.
 
-### `production.poi_imports` (versioning)
-
-One row per POI data refresh. The pipeline uses `max(imported_at)` as the current POI version. The data team (or their import script) should insert a row here whenever they load new POI data.
-
-| Column      | Type        | Description                    |
-|-------------|-------------|--------------------------------|
-| id          | serial      | Primary key                    |
-| imported_at | timestamptz | When the POI dataset was loaded |
-| label       | text        | Optional label (e.g. '2025-03') |
+**POI version (for the feature pipeline):** The pipeline uses **`audit.pipeline_runs.run_timestamp`** (e.g. `max(run_timestamp)`) as the current POI version. That table is maintained by the external POI refresh pipeline; this app does not write to it.
 
 ### `production.property_features` (output, ML input)
 
@@ -117,13 +109,13 @@ One row per property; each column is a spatial indicator. The ML team reads this
 | by_category       | jsonb     | POI count per super_category (1 km). |
 | nearest_km        | jsonb     | Distance in km to nearest POI per super_category. |
 
-Index: `property_features(poi_refreshed_at)` for “pending” queries. When the POI dataset is refreshed, the pipeline recomputes all properties and overwrites rows (one row per property_id); `poi_refreshed_at` always records which POI import produced the features.
+Index: `property_features(poi_refreshed_at)` for “pending” queries. When the POI dataset is refreshed, the pipeline recomputes all properties and overwrites rows (one row per property_id); `poi_refreshed_at` records the POI version timestamp used (from audit.pipeline_runs).
 
 ---
 
 ## Future migration strategy
 
-Today, schema and data are loaded from a **dump** (see [RUNBOOK](RUNBOOK.md#restore-the-poi-dump)); CI uses `init_schema_ci.sql` to create a minimal table set when no dump is present. For **future** schema changes (new tables, columns, or indexes), prefer one of:
+In production the DB is managed elsewhere; for local/dev, schema and data come from a dump or `init_schema_ci.sql` (CI). For **future** schema changes in this repo (new tables, columns, or indexes), prefer one of:
 
 - **Versioned migrations** (e.g. Alembic): introduce a baseline revision matching the current state, then add incremental migrations. Initial data load remains dump + runbook; migrations apply only for DDL changes after the baseline.
 - **Documented process**: if migrations are not adopted, apply schema changes via a new dump or manual SQL, and update this doc and the runbook.

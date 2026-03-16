@@ -30,5 +30,5 @@ Branch flow, versioning, and deployment expectations for the Morocco Spatial Das
 ## Rollback
 
 - **Application:** Redeploy the previous Docker image (by tag or commit). No application code change required.
-- **Database:** This project uses a dump-based schema and data load; there is no migration rollback in the current setup. To “roll back” data, restore a previous dump or run manual SQL; document the steps in [RUNBOOK.md](RUNBOOK.md).
+- **Database:** In production the DB is managed externally (no dump restore by this app). Rollback of app/config does not change DB state. For local/dev, data rollback would be restore a previous dump or manual SQL; document in [RUNBOOK.md](RUNBOOK.md) if needed.
 - **Pipeline:** The feature pipeline is idempotent; re-run it to recompute features. No separate rollback step.

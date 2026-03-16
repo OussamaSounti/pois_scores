@@ -1,6 +1,9 @@
 # Runbook — Morocco Spatial Dashboard
 
-Operations: starting the database, restoring the POI dump, and debugging. POI data is loaded by restoring the provided PostgreSQL dump (see below); there is no separate CSV-import or migration for initial data.
+Operations: starting the database, running the pipeline, and debugging.
+
+- **Production:** The database is already set up and refreshed monthly by another pipeline. This app connects via `DATABASE_URL` and uses that data directly; no restore step.
+- **Local / dev:** You may restore a POI dump for test data, or use the minimal schema from CI (`init_schema_ci.sql`). See below.
 
 ## Start the database (local)
 
@@ -10,11 +13,11 @@ docker compose ps   # ensure db is healthy
 ```
 
 Connection (from host): `postgresql://poi_user:poi_password@localhost:5432/poi_db`  
-Use the same user, password, and database name when restoring the dump.
+Use the same user, password, and database name when restoring a dump (local only).
 
-## Restore the POI dump
+## Restore the POI dump (local / dev only)
 
-The project **does not** create the POI schema via migrations. Schema and data come from a provided PostgreSQL dump (`.dump` or `.sql`). Restore it once after the first `docker compose up`.
+For **local development or CI**, you may load schema and data from a PostgreSQL dump (`.dump` or `.sql`). The project does not create the POI schema via migrations. Restore once after the first `docker compose up` if you need real POI data locally.
 
 ### If the file is custom format (`.dump`)
 
@@ -86,7 +89,7 @@ The pipeline computes spatial indicators for every property in `production.prope
 
 ### Apply pipeline schema (once)
 
-After the POI dump is restored, create the pipeline tables (`production.properties`, `production.poi_imports`, `production.property_features`):
+Create the pipeline tables (`production.properties`, `production.property_features`) when adding the pipeline. In production the schema may already exist (managed by the external pipeline); in local/dev run the script once.
 
 **From host:** The script uses the app config and loads `DATABASE_URL` from `.env` (in `backend/` or project root). If you don't use a `.env` file, set it in the shell first (e.g. `export DATABASE_URL="postgresql://poi_user:poi_password@localhost:5432/poi_db"` or PowerShell: `$env:DATABASE_URL="postgresql://..."`).
 ```bash
@@ -115,17 +118,7 @@ docker compose run --rm pipeline
 0 2 * * * cd /path/to/repo && docker compose run --rm pipeline
 ```
 
-The pipeline processes only **pending** properties: those that do not yet have a row in `property_features` for the current POI version. After a POI refresh (see below), the next run will recompute the entire portfolio. It processes in chunks and commits after each chunk, so it can be restarted after an interruption and will continue from the remaining pending set.
-
-### POI refresh (monthly)
-
-When the data team imports new POI data (e.g. monthly), they must **insert one row** into `production.poi_imports` so the pipeline knows to recompute all property features:
-
-```sql
-INSERT INTO production.poi_imports (imported_at, label) VALUES (now(), '2025-03');
-```
-
-The pipeline uses `max(imported_at)` as the current POI version. Every row in `property_features` stores `poi_refreshed_at` so the ML team can trace which POI dataset produced each set of features.
+The pipeline processes only **pending** properties: those that do not yet have a row in `property_features` for the current POI version. It uses **`audit.pipeline_runs.run_timestamp`** (max) as the current POI version—that table is maintained by the external POI refresh pipeline. After a POI refresh, the next run will recompute the entire portfolio. It processes in chunks and commits after each chunk, so it can be restarted after an interruption and will continue from the remaining pending set.
 
 ---
 
@@ -150,7 +143,7 @@ All must pass for CI to succeed. Integration tests need Postgres with the schema
 
 ## Schema change policy
 
-The current approach is **dump-first**: schema and data come from a restored PostgreSQL dump (and, in CI, from `init_schema_ci.sql`). There is no migration runner in the repo today.
-
-- **When Alembic (or similar) is adopted:** run a baseline revision that matches the current schema; then apply incremental migrations for future DDL changes. Initial load (dump restore) remains as documented above.
-- **Until then:** any schema change (new table, column, or index) requires either a **new dump** or **manual SQL**; update [DATA_MODEL.md](DATA_MODEL.md) and this runbook accordingly.
+- **Production:** The database is managed elsewhere (existing DB, refreshed by another pipeline). Schema changes there are outside this repo.
+- **Local / dev:** Schema and data come from a dump or from `init_schema_ci.sql` (CI). There is no migration runner in the repo today.
+- **When Alembic (or similar) is adopted:** run a baseline revision that matches the current schema; then add incremental migrations for future DDL changes.
+- **Until then:** any schema change in this app's scope (e.g. pipeline tables) requires manual SQL or script updates; update [DATA_MODEL.md](DATA_MODEL.md) and this runbook accordingly.

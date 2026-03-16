@@ -25,7 +25,7 @@ High-level design and data flow for the dashboard, API, and database.
 
 - **Dashboard** and any external client call the **same API** (single-location and batch scores, POI list).
 - **Backend** is the only component that talks to the database. No direct DB access from the frontend.
-- **Database** schema and data come from a restored dump; the app does not run migrations for the initial POI schema.
+- **Database** in production is an existing DB (refreshed by another pipeline); the app does not run migrations or restore dumps. For local/dev, use a dump or init script.
 
 ## Data flow
 
@@ -56,9 +56,9 @@ High-level design and data flow for the dashboard, API, and database.
 |------------|------|
 | **Frontend** | React SPA; Single tab (map, metrics, POI list, section filters), Batch tab (input, file drop, results table, export CSV, row → Single). |
 | **Backend**  | FastAPI; `/health`, `/ready`, `/api/v1/scores`, `/api/v1/scores/batch`, `/api/v1/pois`; config via env (`DATABASE_URL`, `CORS_ORIGINS`). |
-| **Database** | PostgreSQL 15+ with PostGIS; table `production.pois` (id, name, fclass, super_category, lat/lon, geom). Schema from dump, not migrations. |
+| **Database** | PostgreSQL 15+ with PostGIS; table `production.pois_current` (and audit/staging). Production = existing DB; local/dev = dump or init script. |
 
 ## Configuration and “real” database
 
-- **Development:** Local Postgres in Docker (and optional backend in Docker); restore the same dump or a subset.
-- **Production / real data:** Restore the dump (or an updated one) on the target Postgres; set `DATABASE_URL` to that instance. No code change—only configuration. See [RUNBOOK.md](RUNBOOK.md) for restore steps and [DATA_MODEL.md](DATA_MODEL.md) for the schema.
+- **Development:** Local Postgres in Docker (and optional backend in Docker); optionally restore a dump or use minimal schema for tests.
+- **Production:** Connect to the existing database via `DATABASE_URL`; no restore. The DB is set up and refreshed monthly by another pipeline. See [RUNBOOK.md](RUNBOOK.md) and [DATA_MODEL.md](DATA_MODEL.md).
