@@ -1,6 +1,6 @@
 # Morocco Spatial Dashboard
 
-POI-based spatial scores for any location in Morocco. Single-location and batch endpoints; dashboard for analysts and internal tools. Data lives in PostgreSQL (schema and data from a provided dump).
+POI-based spatial scores for any location in Morocco. Single-location and batch endpoints; dashboard for analysts and internal tools. **Production:** the database is already set up and refreshed by another pipeline; this app connects and uses it directly. **Local/dev:** optional dump or minimal schema for testing.
 
 ## Repository (GitLab)
 
@@ -46,8 +46,8 @@ Use the `main` branch as default; use feature branches and Merge Requests for ch
    docker compose up -d db
    ```
 
-3. **Restore the POI dump**
-   The application uses a PostgreSQL dump (`.dump` or `.sql`) as the source of schema and data. Restore it **after** the first start. See [docs/RUNBOOK.md](docs/RUNBOOK.md) for exact commands (`pg_restore` or `psql`).
+3. **Optional (local): restore a POI dump**
+   For local data, you can restore a PostgreSQL dump (`.dump` or `.sql`) after the first start. See [docs/RUNBOOK.md](docs/RUNBOOK.md) for commands. Production uses the existing DB; no restore.
 
 4. **Document the schema**
    After restore, inspect tables in `psql` and record the actual table and column names in [docs/DATA_MODEL.md](docs/DATA_MODEL.md). The backend will use this to query POIs (no schema creation in code).
@@ -92,7 +92,7 @@ Set `VITE_API_URL` in `frontend/.env` to point to another API base (e.g. `http:/
 
 ## Feature engineering pipeline
 
-An automated pipeline computes spatial indicators for every property in `production.properties` and writes them to `production.property_features` (direct ML input; no API calls). It reuses the same spatial logic as the API. Apply the pipeline schema once (see [docs/RUNBOOK.md](docs/RUNBOOK.md#feature-engineering-pipeline)), then run on demand or on a schedule (e.g. nightly): `docker compose run --rm pipeline`. When the POI database is refreshed monthly, the data team inserts a row into `production.poi_imports`; the next pipeline run then recomputes features for the entire portfolio. Each row in `property_features` stores `poi_refreshed_at` for reproducibility.
+An automated pipeline computes spatial indicators for every property in `production.properties` and writes them to `production.property_features` (direct ML input; no API calls). It reuses the same spatial logic as the API. Apply the pipeline schema once (see [docs/RUNBOOK.md](docs/RUNBOOK.md#feature-engineering-pipeline)), then run on demand or on a schedule (e.g. nightly): `docker compose run --rm pipeline`. POI versioning comes from **`audit.pipeline_runs.run_timestamp`** (maintained by the external POI refresh pipeline). When POI data is refreshed, the next pipeline run recomputes features for the entire portfolio. Each row in `property_features` stores `poi_refreshed_at` for reproducibility.
 
 ## Run tests
 
