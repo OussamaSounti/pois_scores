@@ -1,4 +1,4 @@
-"""Apply pipeline schema (properties, poi_imports, property_features). Run once after dump."""
+"""Apply pipeline schema (properties, property_features). Run once when adding the pipeline."""
 
 import os
 import sys
