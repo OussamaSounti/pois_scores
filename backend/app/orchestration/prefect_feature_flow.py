@@ -84,8 +84,10 @@ def run_feature_pipeline(chunk_size: int = 200) -> int:
     """Run the existing feature pipeline implementation."""
     return run_pipeline(chunk_size=chunk_size)
 
+
 def monthly_poi_collecting_audit_flow(chunk_size: int = 200) -> int:
     return run_pipeline(chunk_size=chunk_size)
+
 
 @flow(name="monthly-poi-feature-recompute")
 def monthly_poi_feature_recompute_flow(chunk_size: int = 200) -> dict[str, str | int]:
@@ -95,8 +97,7 @@ def monthly_poi_feature_recompute_flow(chunk_size: int = 200) -> dict[str, str |
     external_ts = get_latest_external_refresh()
     if external_ts is None:
         logger.warning(
-            "No external refresh timestamp found in audit.pipeline_runs. "
-            "Skipping automation run."
+            "No external refresh timestamp found in audit.pipeline_runs. Skipping automation run."
         )
         return {"status": "skipped", "reason": "no_external_refresh"}
 
