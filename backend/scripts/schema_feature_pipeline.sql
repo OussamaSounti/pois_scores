@@ -1,5 +1,5 @@
--- Feature engineering pipeline: input/output and POI versioning.
--- Run once after dump restore (or when adding the pipeline). Uses production schema.
+-- Feature engineering pipeline: input/output. POI version from audit.pipeline_runs (external).
+-- Run once when adding the pipeline (local/dev) or schema is managed in production.
 CREATE SCHEMA IF NOT EXISTS production;
 
 -- Input: portfolio of properties (id, coordinates, optional metadata).
@@ -8,13 +8,6 @@ CREATE TABLE IF NOT EXISTS production.properties (
     latitude double precision NOT NULL,
     longitude double precision NOT NULL,
     metadata jsonb
-);
-
--- POI versioning: data team inserts one row per POI refresh; pipeline uses max(imported_at).
-CREATE TABLE IF NOT EXISTS production.poi_imports (
-    id serial PRIMARY KEY,
-    imported_at timestamptz NOT NULL DEFAULT now(),
-    label text
 );
 
 -- Output: one row per property, flattened spatial indicators (ML input).
