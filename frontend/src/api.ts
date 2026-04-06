@@ -36,6 +36,60 @@ export type PoiItem = {
   distance_km: number;
 };
 
+export type PropertyScores = {
+  poi_refreshed_at: string | null;
+  pipeline_version: string | null;
+  poi_count_1km: number | null;
+  poi_count_400m: number | null;
+  n_categories: number | null;
+  n_poi_types: number | null;
+  entropy: number | null;
+  entropy_fclass: number | null;
+  aggregate_score: number | null;
+  accessibility_400m: Record<string, boolean>;
+  by_category: Record<string, number>;
+  nearest_km: Record<string, number>;
+};
+
+export type PropertyMapItem = {
+  id: number;
+  latitude: number;
+  longitude: number;
+  transaction_date: string | null;
+  asset_price: number | null;
+  asset_surface: number | null;
+  asset_psqm: number | null;
+  asset_type: string | null;
+  district_uid: string | null;
+  district_name: string | null;
+  neighbourhood_uid: string | null;
+  neighbour_name: string | null;
+  iris_uid: string | null;
+  iris_code: string | null;
+  ilot_uid: string | null;
+  ilot_objectid: string | null;
+  scores: PropertyScores;
+};
+
+export type PropertyStatsGroup = {
+  key: string;
+  label: string;
+  properties_count: number;
+  avg_poi_count_1km: number | null;
+  avg_entropy: number | null;
+  avg_entropy_fclass: number | null;
+  avg_aggregate_score: number | null;
+};
+
+export type PropertyLevel = 'district' | 'neighbourhood' | 'iris' | 'ilot';
+
+export type PropertiesFilters = {
+  district_uid?: string;
+  neighbourhood_uid?: string;
+  iris_uid?: string;
+  ilot_uid?: string;
+};
+
 export async function fetchPois(
   lat: number,
   lon: number,
@@ -68,4 +122,50 @@ export async function fetchBatch(
   if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
   const data = await res.json();
   return data.results ?? [];
+}
+
+export async function fetchPropertiesMap(
+  bbox: { west: number; south: number; east: number; north: number },
+  filters: PropertiesFilters = {},
+  limit: number = 1200
+): Promise<{ items: PropertyMapItem[]; count: number }> {
+  const params = new URLSearchParams({
+    west: String(bbox.west),
+    south: String(bbox.south),
+    east: String(bbox.east),
+    north: String(bbox.north),
+    limit: String(limit),
+  });
+  if (filters.district_uid) params.set('district_uid', filters.district_uid);
+  if (filters.neighbourhood_uid) params.set('neighbourhood_uid', filters.neighbourhood_uid);
+  if (filters.iris_uid) params.set('iris_uid', filters.iris_uid);
+  if (filters.ilot_uid) params.set('ilot_uid', filters.ilot_uid);
+
+  const res = await fetch(`${API_BASE}/api/v1/properties?${params.toString()}`);
+  if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
+  const data = await res.json();
+  return { items: data.items ?? [], count: data.count ?? 0 };
+}
+
+export async function fetchPropertyDetail(propertyId: number): Promise<PropertyMapItem> {
+  const res = await fetch(`${API_BASE}/api/v1/properties/${propertyId}`);
+  if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
+  const data = await res.json();
+  return data.item;
+}
+
+export async function fetchPropertyStats(
+  level: PropertyLevel,
+  filters: PropertiesFilters = {}
+): Promise<PropertyStatsGroup[]> {
+  const params = new URLSearchParams({ level });
+  if (filters.district_uid) params.set('district_uid', filters.district_uid);
+  if (filters.neighbourhood_uid) params.set('neighbourhood_uid', filters.neighbourhood_uid);
+  if (filters.iris_uid) params.set('iris_uid', filters.iris_uid);
+  if (filters.ilot_uid) params.set('ilot_uid', filters.ilot_uid);
+
+  const res = await fetch(`${API_BASE}/api/v1/properties/stats?${params.toString()}`);
+  if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
+  const data = await res.json();
+  return data.groups ?? [];
 }
