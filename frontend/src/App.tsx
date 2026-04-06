@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react';
 import BatchView from './components/BatchView';
+import PropertiesView from './components/PropertiesView';
 import SingleView from './components/SingleView';
 
-type Tab = 'single' | 'batch';
+type Tab = 'single' | 'batch' | 'properties';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('single');
@@ -50,6 +51,13 @@ export default function App() {
         >
           Batch
         </button>
+        <button
+          type="button"
+          className={`tab ${tab === 'properties' ? 'active' : ''}`}
+          onClick={() => setTab('properties')}
+        >
+          Properties
+        </button>
       </div>
 
       <div className="main" style={{ display: tab === 'single' ? 'flex' : 'none' }}>
@@ -64,6 +72,9 @@ export default function App() {
       </div>
       <div className="main" style={{ display: tab === 'batch' ? 'flex' : 'none' }}>
         <BatchView onRowClick={goToSingleWithLocation} />
+      </div>
+      <div className="main" style={{ display: tab === 'properties' ? 'flex' : 'none' }}>
+        <PropertiesView onGoToSingle={goToSingleWithLocation} />
       </div>
     </>
   );

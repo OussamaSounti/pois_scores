@@ -127,6 +127,36 @@ body {
   outline: none;
 }
 .coord-field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(41,194,92,0.15); }
+.properties-select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  background: var(--panel);
+  border: 1.5px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-m);
+  font-size: 12px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  outline: none;
+}
+.properties-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(41,194,92,0.15);
+}
+.properties-select:disabled { opacity: 0.6; cursor: not-allowed; }
+.hierarchy-tooltip {
+  font-family: var(--font-h);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(10,12,20,0.85);
+  color: #fff;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+.hierarchy-tooltip::before { border: none !important; }
 .analyze-btn {
   width: 100%;
   background: var(--accent);
