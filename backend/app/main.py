@@ -7,7 +7,7 @@ from prometheus_client import CONTENT_TYPE_LATEST
 
 from app.config import get_settings
 from app.metrics import get_metrics
-from app.routers import health, pois, properties, scores
+from app.routers import geo, health, pois, properties, scores
 
 app = FastAPI(
     title="Morocco Spatial Dashboard API",
@@ -28,6 +28,7 @@ app.include_router(health.router)
 app.include_router(scores.router, prefix="/api/v1")
 app.include_router(pois.router, prefix="/api/v1")
 app.include_router(properties.router, prefix="/api/v1")
+app.include_router(geo.router, prefix="/api/v1")
 
 
 @app.get("/metrics", include_in_schema=False)

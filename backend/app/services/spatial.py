@@ -133,6 +133,179 @@ def _entropy(counts: dict[str, int], total: int) -> float:
     return h
 
 
+def _land_buffer_fraction(dist_coast_km: float, radius_km: float = 1.0) -> float:
+    """
+    Fraction of a circle (radius=radius_km) that lies on land when the centre
+    is at distance dist_coast_km from a **straight** coastline.
+
+    Uses the circular-segment formula:
+        ocean_cap_area = r² · arccos(d/r) − d · √(r²−d²)
+        land_fraction  = 1 − ocean_cap_area / (π·r²)
+
+    NOTE: This is a fallback approximation only.  For capes, peninsulas, bays
+    or any non-linear coastline use _land_buffer_fraction_db() which computes
+    the true intersection via PostGIS land polygons.
+
+    Special cases:
+      - dist_coast_km >= radius_km  → 1.0  (buffer fully on land)
+      - dist_coast_km == 0          → 0.5  (buffer half on land, half in ocean)
+    """
+    if dist_coast_km >= radius_km:
+        return 1.0
+    d = max(dist_coast_km, 0.0)
+    ratio = d / radius_km  # in [0, 1)
+    ocean_fraction = (math.acos(ratio) - ratio * math.sqrt(1.0 - ratio**2)) / math.pi
+    return max(0.0, min(1.0, 1.0 - ocean_fraction))
+
+
+def _land_buffer_fraction_db(
+    session: Session,
+    lat: float,
+    lon: float,
+    radius_m: float = 1000.0,
+) -> float | None:
+    """
+    Compute the fraction of a circular buffer that lies on land.
+
+    Algorithm:
+      1. Union all nearby OSM coastline rows into one blade geometry.
+      2. ST_Split(buffer_circle, blade) → 1 or 2 polygon pieces.
+      3. Find the "center piece" — the piece that contains the query point.
+      4. Ask geo.land (NE 10m) whether the query point itself is on land.
+         - Yes → land area = area of center piece.
+         - No  → land area = buffer area − area of center piece.
+      5. land_fraction = land_area / buffer_area.
+
+    This avoids ray-casting (which breaks on open polylines like OSM coastline
+    segments) and avoids topology issues with ST_Node/ST_Polygonize.
+    Returns None only when geo.coastline or the query fails.
+    """
+    sql = text("""
+        WITH
+        pt  AS (SELECT ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geom),
+        buf AS (SELECT ST_Buffer(pt.geom::geography, :radius_m)::geometry AS geom FROM pt),
+
+        -- Union all OSM coastline rows within 1.5 × radius into one blade.
+        coast AS (
+            SELECT ST_Union(c.geom) AS geom
+            FROM   geo.coastline c, pt
+            WHERE  ST_DWithin(c.geom::geography, pt.geom::geography, :radius_m * 1.5)
+        ),
+
+        -- Split the buffer by the coastline blade.
+        -- If no coast is within range, keep the full buffer as one piece.
+        split_polys AS (
+            SELECT (ST_Dump(ST_Split(buf.geom, coast.geom))).geom AS geom
+            FROM   buf, coast
+            WHERE  coast.geom IS NOT NULL
+            UNION ALL
+            SELECT buf.geom
+            FROM   buf
+            WHERE  (SELECT coast.geom FROM coast) IS NULL
+        ),
+
+        -- Is the query point on land?  geo.land is the NE 10m Morocco polygon,
+        -- accurate to ~500 m — reliable enough for the center-point check since
+        -- _land_buffer_fraction_db is only called when dist_coast < 1 km and the
+        -- user will restrict to on-land locations.
+        center_on_land AS (
+            SELECT EXISTS (
+                SELECT 1 FROM geo.land l
+                WHERE  ST_Contains(l.geom, (SELECT pt.geom FROM pt))
+            ) AS val
+        ),
+
+        -- The piece that contains the query point (the "same side" piece).
+        -- LIMIT 1 guards against floating-point edge cases where the point
+        -- lands exactly on the split boundary.
+        center_piece AS (
+            SELECT ST_Area(geom::geography) AS area_m2
+            FROM   split_polys
+            WHERE  ST_Contains(geom, (SELECT pt.geom FROM pt))
+            LIMIT  1
+        ),
+
+        -- Land area calculation:
+        --   center on land  → land = center_piece                            
+        --   center in ocean → land = buffer − center_piece (the other slices)
+        land_area AS (
+            SELECT
+                CASE WHEN col.val
+                    THEN COALESCE(cp.area_m2,  ST_Area(buf.geom::geography))
+                    ELSE ST_Area(buf.geom::geography) - COALESCE(cp.area_m2, 0.0)
+                END AS val
+            FROM  center_on_land col, buf
+            LEFT JOIN center_piece cp ON TRUE
+        )
+
+        SELECT GREATEST(0.0, LEAST(1.0,
+            la.val / NULLIF(ST_Area(buf.geom::geography), 0.0)
+        )) AS land_fraction
+        FROM land_area la, buf
+    """)
+    try:
+        row = session.execute(
+            sql, {"lat": lat, "lon": lon, "radius_m": radius_m}
+        ).fetchone()
+    except Exception:  # noqa: BLE001 – table absent or schema missing
+        return None
+    if row is None or row.land_fraction is None:
+        return None
+    return round(max(0.0, min(1.0, float(row.land_fraction))), 4)
+
+
+def _is_on_land(session: Session, lat: float, lon: float) -> bool:
+    """Return True if the point is inside geo.land (i.e. on land, not in ocean).
+
+    Used as a fast path for points more than 1 km from the coastline where
+    the answer is binary.  geo.land is the Natural Earth 10 m Morocco polygon
+    which is accurate to ~500 m — reliable at the 1 km threshold.
+    Defaults to True (land) when the table is absent.
+    """
+    sql = text("""
+        SELECT EXISTS (
+            SELECT 1 FROM geo.land l
+            WHERE ST_Contains(
+                l.geom,
+                ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)
+            )
+        ) AS on_land
+    """)
+    try:
+        row = session.execute(sql, {"lat": lat, "lon": lon}).fetchone()
+    except Exception:  # noqa: BLE001
+        return True
+    return bool(row.on_land) if row is not None else True
+
+
+def _dist_coast_km(
+    session: Session,
+    lat: float,
+    lon: float,
+) -> float | None:
+    """
+    Geodesic distance (km) from the given point to the nearest feature in
+    geo.coastline.  Returns None when the table does not exist or is empty.
+    """
+    sql = text("""
+        SELECT
+            ST_Distance(
+                geom::geography,
+                ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
+            ) / 1000.0 AS dist_km
+        FROM geo.coastline
+        ORDER BY geom <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)
+        LIMIT 1
+    """)
+    try:
+        row = session.execute(sql, {"lat": lat, "lon": lon}).fetchone()
+    except Exception:  # noqa: BLE001 – table absent or schema missing
+        return None
+    if row is None:
+        return None
+    return round(float(row.dist_km), 4)
+
+
 def _nearest_km_by_category(
     session: Session,
     lat: float,
@@ -189,12 +362,43 @@ def compute_scores(session: Session, lat: float, lon: float) -> dict[str, Any]:
 
     nearest_km = _nearest_km_by_category(session, lat, lon)
 
+    # --- Coastal correction -----------------------------------------------
+    # Properties on the seafront have part of their buffer in the ocean, which
+    # artificially lowers raw POI counts.  We measure the distance to the
+    # nearest coastline and derive the fraction of the 1 km buffer that is on
+    # land.  That fraction is used to normalise the density component so that
+    # a beachfront property is not penalised relative to an equivalent inland
+    # property.  dist_coast_km is also returned as a standalone feature
+    # (beach proximity is a market-value premium).
+    dist_coast = _dist_coast_km(session, lat, lon)
+
+    # Only run the PostGIS polygonize when the 1 km buffer actually straddles
+    # the coastline (i.e. dist_coast < 1 km).  This avoids the per-query
+    # ST_Node / ST_Polygonize overhead for the vast majority of inland
+    # properties where the land fraction is simply 1.0.
+    if dist_coast is not None and dist_coast < 1.0:
+        # Buffer overlaps the coast — use OSM-geometry-accurate polygonize.
+        land_frac_1km = _land_buffer_fraction_db(session, lat, lon, radius_m=1000.0)
+        if land_frac_1km is None:
+            # geo.coastline / geo.land missing — fall back to straight formula
+            land_frac_1km = _land_buffer_fraction(dist_coast, radius_km=1.0)
+    elif dist_coast is not None:
+        # Buffer is entirely on one side of the coast (> 1 km away).
+        # Could be deep inland OR fully in the ocean — check which.
+        land_frac_1km = 1.0 if _is_on_land(session, lat, lon) else 0.0
+    else:
+        # No coastline data loaded at all — assume land.
+        land_frac_1km = 1.0
+
     # Optional aggregate: simple weighted mix (placeholder formula)
     agg = None
     if by_category:
         n_cat = len(by_category)
         n_type = len(fclasses_1km)
-        dens = min(total_1km / 50.0, 1.0)  # cap density component
+        # Normalise density by the land fraction so ocean-side buffers are not
+        # penalised.  land_frac_1km == 1.0 when no coastline table is loaded.
+        effective_count_1km = total_1km / land_frac_1km if land_frac_1km > 0 else total_1km
+        dens = min(effective_count_1km / 50.0, 1.0)
         div = min((n_cat / 10.0 + n_type / 20.0) / 2, 1.0)
         acc = sum(accessibility_400m.values()) / max(len(ACCESSIBILITY_KEY_TYPES), 1)
         agg = round(100.0 * (0.3 * dens + 0.3 * div + 0.4 * acc), 1)
@@ -210,4 +414,6 @@ def compute_scores(session: Session, lat: float, lon: float) -> dict[str, Any]:
         "accessibility_400m": accessibility_400m,
         "nearest_km": nearest_km,
         "aggregate_score": agg,
+        "dist_coast_km": dist_coast,
+        "land_buffer_fraction_1km": round(land_frac_1km, 4),
     }

@@ -20,6 +20,8 @@ export type ScoreResponse = {
     accessibility_400m: Record<string, boolean>;
     nearest_km: Record<string, number>;
     aggregate_score: number | null;
+    dist_coast_km: number | null;
+    land_buffer_fraction_1km: number | null;
   };
 };
 
@@ -49,6 +51,8 @@ export type PropertyScores = {
   accessibility_400m: Record<string, boolean>;
   by_category: Record<string, number>;
   nearest_km: Record<string, number>;
+  dist_coast_km: number | null;
+  land_buffer_fraction_1km: number | null;
 };
 
 export type PropertyMapItem = {

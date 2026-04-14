@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
-import { Circle, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { useEffect, useRef, useState } from 'react';
+import { Circle, GeoJSON, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import type { FeatureCollection } from 'geojson';
 import type { PoiItem } from '../api';
 import { CAT_COLORS } from '../constants';
 
@@ -106,10 +107,49 @@ export default function MapView({
   const mapCenter = center ?? MOROCCO_CENTER;
   const mapZoom = center ? LOCATION_ZOOM : MOROCCO_ZOOM;
   const markerRefs = useRef<Record<number, L.Marker | null>>({});
+  const [showLand, setShowLand] = useState(false);
+  const [showCoastline, setShowCoastline] = useState(false);
+  const [landGeo, setLandGeo] = useState<FeatureCollection | null>(null);
+  const [coastlineGeo, setCoastlineGeo] = useState<FeatureCollection | null>(null);
+
+  useEffect(() => {
+    if (showLand && !landGeo) {
+      fetch('/api/v1/geo/land')
+        .then((r) => r.json())
+        .then(setLandGeo)
+        .catch(console.error);
+    }
+  }, [showLand, landGeo]);
+
+  useEffect(() => {
+    if (showCoastline && !coastlineGeo) {
+      fetch('/api/v1/geo/coastline')
+        .then((r) => r.json())
+        .then(setCoastlineGeo)
+        .catch(console.error);
+    }
+  }, [showCoastline, coastlineGeo]);
 
   return (
     <div className="map-wrap">
       <div className="map-inner">
+        {/* Geo overlay toggles */}
+        <div className="geo-overlay-btns">
+          <button
+            className={`geo-toggle-btn${showLand ? ' active' : ''}`}
+            onClick={() => setShowLand((v) => !v)}
+            title="Toggle land polygon (geo.land)"
+          >
+            Land polygon
+          </button>
+          <button
+            className={`geo-toggle-btn${showCoastline ? ' active' : ''}`}
+            onClick={() => setShowCoastline((v) => !v)}
+            title="Toggle coastline segments (geo.coastline)"
+          >
+            Coastline
+          </button>
+        </div>
         <MapContainer
           center={mapCenter}
           zoom={mapZoom}
@@ -120,6 +160,21 @@ export default function MapView({
           {center && <SetView center={center} zoom={LOCATION_ZOOM} />}
           <TileLayer url={CARTO_URL} attribution={CARTO_ATTR} maxZoom={19} />
           <DblClickHandler onLocation={onLocationSelect} />
+          {/* Geo verification layers */}
+          {showLand && landGeo && (
+            <GeoJSON
+              key="land"
+              data={landGeo}
+              style={{ color: '#1e9d65', weight: 2, fillColor: '#1e9d65', fillOpacity: 0.12 }}
+            />
+          )}
+          {showCoastline && coastlineGeo && (
+            <GeoJSON
+              key="coastline"
+              data={coastlineGeo}
+              style={{ color: '#1a7fa8', weight: 2.5, fillOpacity: 0 }}
+            />
+          )}
           {center && (
             <>
               <Circle

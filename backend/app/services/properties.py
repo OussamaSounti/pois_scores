@@ -63,6 +63,14 @@ def _score_payload_from_row(row: Any) -> dict[str, Any]:
         },
         "by_category": dict(row.by_category or {}),
         "nearest_km": dict(row.nearest_km or {}),
+        "dist_coast_km": (
+            float(row.dist_coast_km) if row.dist_coast_km is not None else None
+        ),
+        "land_buffer_fraction_1km": (
+            float(row.land_buffer_fraction_1km)
+            if row.land_buffer_fraction_1km is not None
+            else None
+        ),
     }
 
 
@@ -117,7 +125,9 @@ def list_properties_for_map(
                 acc_doctors,
                 acc_taxi,
                 by_category,
-                nearest_km
+                nearest_km,
+                dist_coast_km,
+                land_buffer_fraction_1km
             FROM production.property_features
             ORDER BY property_id, poi_refreshed_at DESC
         )
@@ -161,7 +171,9 @@ def list_properties_for_map(
             f.acc_doctors,
             f.acc_taxi,
             f.by_category,
-            f.nearest_km
+            f.nearest_km,
+            f.dist_coast_km,
+            f.land_buffer_fraction_1km
         FROM production.properties p
         LEFT JOIN latest_features f ON f.property_id = p.id
         WHERE p.longitude BETWEEN :west AND :east
@@ -241,7 +253,9 @@ def get_property_detail(session: Session, property_id: int) -> dict[str, Any] | 
                 acc_doctors,
                 acc_taxi,
                 by_category,
-                nearest_km
+                nearest_km,
+                dist_coast_km,
+                land_buffer_fraction_1km
             FROM production.property_features
             ORDER BY property_id, poi_refreshed_at DESC
         )
@@ -285,7 +299,9 @@ def get_property_detail(session: Session, property_id: int) -> dict[str, Any] | 
             f.acc_doctors,
             f.acc_taxi,
             f.by_category,
-            f.nearest_km
+            f.nearest_km,
+            f.dist_coast_km,
+            f.land_buffer_fraction_1km
         FROM production.properties p
         LEFT JOIN latest_features f ON f.property_id = p.id
         WHERE p.id = :property_id

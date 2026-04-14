@@ -1,6 +1,8 @@
 """Unit tests for spatial service (entropy, haversine)."""
 
-from app.services.spatial import _entropy, _haversine_km
+import math
+
+from app.services.spatial import _entropy, _haversine_km, _land_buffer_fraction
 
 
 class TestHaversine:
@@ -51,3 +53,41 @@ class TestEntropy:
         h_uniform = _entropy({"A": 50, "B": 50}, 100)
         assert h_skewed < h_uniform
         assert h_skewed > 0
+
+
+class TestLandBufferFraction:
+    """Tests for _land_buffer_fraction (circular-segment formula)."""
+
+    def test_far_from_coast_returns_one(self) -> None:
+        # Distance >= radius → entirely on land
+        assert _land_buffer_fraction(2.0, radius_km=1.0) == 1.0
+        assert _land_buffer_fraction(1.0, radius_km=1.0) == 1.0
+
+    def test_on_coast_returns_half(self) -> None:
+        # Right on the coastline → exactly half the buffer is on land
+        result = _land_buffer_fraction(0.0, radius_km=1.0)
+        assert abs(result - 0.5) < 1e-6
+
+    def test_near_coast_between_half_and_one(self) -> None:
+        # 500 m from a 1 km buffer coast → land fraction between 0.5 and 1.0
+        result = _land_buffer_fraction(0.5, radius_km=1.0)
+        assert 0.5 < result < 1.0
+
+    def test_fraction_increases_with_distance(self) -> None:
+        fracs = [_land_buffer_fraction(d, radius_km=1.0) for d in [0.0, 0.25, 0.5, 0.75, 1.0]]
+        assert fracs == sorted(fracs)
+
+    def test_formula_value_at_half_radius(self) -> None:
+        # d = r/2 → ratio = 0.5
+        # ocean_fraction = (arccos(0.5) - 0.5*sqrt(0.75)) / pi
+        ratio = 0.5
+        expected_ocean = (math.acos(ratio) - ratio * math.sqrt(1 - ratio**2)) / math.pi
+        expected = 1.0 - expected_ocean
+        result = _land_buffer_fraction(0.5, radius_km=1.0)
+        assert abs(result - expected) < 1e-9
+
+    def test_clamps_to_valid_range(self) -> None:
+        # No result should be outside [0, 1]
+        for d in [-1.0, 0.0, 0.3, 1.0, 5.0]:
+            r = _land_buffer_fraction(d, radius_km=1.0)
+            assert 0.0 <= r <= 1.0

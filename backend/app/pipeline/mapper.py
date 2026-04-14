@@ -36,6 +36,8 @@ def score_dict_to_feature_row(
         "aggregate_score": scores.get("aggregate_score"),
         "by_category": scores["by_category"],
         "nearest_km": scores["nearest_km"],
+        "dist_coast_km": scores.get("dist_coast_km"),
+        "land_buffer_fraction_1km": scores.get("land_buffer_fraction_1km"),
     }
     acc = scores.get("accessibility_400m", {})
     for k in ACC_KEYS:

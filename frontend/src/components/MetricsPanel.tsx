@@ -32,6 +32,30 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
   const maxD = Math.max(1, ...byCat.map(([, v]) => v));
   const nearest = Object.entries(s.nearest_km).sort((a, b) => a[1] - b[1]);
 
+  // ── Coastal proximity helpers ──────────────────────────────────
+  const distCoast = s.dist_coast_km;
+  const landFrac  = s.land_buffer_fraction_1km ?? 1.0;
+  const oceanFrac = 1.0 - landFrac;
+  // Show the card only when there is real coastal information:
+  // either we have a measured coastline distance, OR the buffer is partially in the ocean.
+  const showCoastal = distCoast != null || (s.land_buffer_fraction_1km != null && landFrac < 0.999);
+  // Donut ring geometry
+  const R = 26, CX = 34, CY = 34;
+  const circ = 2 * Math.PI * R;
+  // Proximity category
+  const coastBadge =
+    distCoast == null       ? null
+    : distCoast < 0.2      ? { label: 'Beachfront', cls: 'beachfront' }
+    : distCoast < 0.5      ? { label: 'Seafront',   cls: 'seafront'   }
+    : distCoast < 1.0      ? { label: 'Near Sea',   cls: 'near-sea'   }
+    :                        { label: 'Coastal',    cls: 'coastal'    };
+  // Human-friendly distance display (m when < 1 km)
+  const distDisplay = distCoast != null
+    ? (distCoast < 1
+        ? { val: Math.round(distCoast * 1000).toString(), unit: 'm' }
+        : { val: distCoast.toFixed(2), unit: 'km' })
+    : null;
+
   const filterLabel =
     activeFilter?.section === 'accessibility'
       ? (ACC_META[activeFilter.value]?.label ?? activeFilter.value)
@@ -204,6 +228,125 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
               <div className="nearest-dist">{dist} km</div>
             </div>
           ))}
+        </div>
+      )}
+
+      {showCoastal && (
+        <div className="coastal-card">
+          {/* ── Wave header with proximity badge ── */}
+          <div className="coastal-wave-header">
+            <span className="coastal-wave-title">🌊 Coastal proximity</span>
+            {coastBadge && (
+              <span className={`coastal-badge ${coastBadge.cls}`}>{coastBadge.label}</span>
+            )}
+          </div>
+
+          {/* ── Body: donut ring + distance stats ── */}
+          <div className="coastal-body">
+            {/* SVG donut — land vs ocean fraction */}
+            <div className="coastal-ring-wrap">
+              <svg width="68" height="68" viewBox="0 0 68 68" aria-hidden="true">
+                {/* track */}
+                <circle cx={CX} cy={CY} r={R} fill="none" stroke="#dde2ef" strokeWidth="8" />
+                {/* ocean arc */}
+                {oceanFrac > 0.001 && (
+                  <circle
+                    cx={CX} cy={CY} r={R}
+                    fill="none"
+                    stroke="#1a7fa8"
+                    strokeWidth="8"
+                    strokeDasharray={`${oceanFrac * circ} ${circ}`}
+                    strokeDashoffset={0}
+                    strokeLinecap="butt"
+                    transform={`rotate(-90 ${CX} ${CY})`}
+                  />
+                )}
+                {/* land arc */}
+                <circle
+                  cx={CX} cy={CY} r={R}
+                  fill="none"
+                  stroke="#1e9d65"
+                  strokeWidth="8"
+                  strokeDasharray={`${landFrac * circ} ${circ}`}
+                  strokeDashoffset={-(oceanFrac * circ)}
+                  strokeLinecap="butt"
+                  transform={`rotate(-90 ${CX} ${CY})`}
+                />
+                {/* centre label */}
+                <text
+                  x={CX} y={CY - 4}
+                  textAnchor="middle"
+                  fill="#1e9d65"
+                  fontSize="13"
+                  fontWeight="600"
+                  fontFamily="JetBrains Mono, monospace"
+                >
+                  {(landFrac * 100).toFixed(0)}%
+                </text>
+                <text
+                  x={CX} y={CY + 9}
+                  textAnchor="middle"
+                  fill="#8a93b2"
+                  fontSize="7"
+                  fontFamily="Syne, sans-serif"
+                  letterSpacing="0.5"
+                >
+                  LAND
+                </text>
+              </svg>
+              <div className="coastal-ring-caption">Buffer area</div>
+            </div>
+
+            {/* Distance + correction note */}
+            <div className="coastal-stats">
+              {distDisplay != null ? (
+                <>
+                  <div className="coastal-dist-value">
+                    {distDisplay.val}
+                    <span className="coastal-dist-unit">{distDisplay.unit}</span>
+                  </div>
+                  <div className="coastal-dist-label">
+                    to nearest coastline
+                    <Tooltip text={SCORE_TOOLTIPS.dist_coast_km} />
+                  </div>
+                </>
+              ) : (
+                <div className="coastal-dist-label">
+                  Land buffer only
+                  <Tooltip text={SCORE_TOOLTIPS.land_buffer_fraction_1km} />
+                </div>
+              )}
+              {landFrac < 0.999 && (
+                <div className="coastal-correction-note">
+                  <strong>{(oceanFrac * 100).toFixed(0)}%</strong> of the 1 km buffer
+                  extends into the ocean — density score auto‑corrected.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Ocean / land split bar ── */}
+          <div className="coastal-split-wrap">
+            <div className="coastal-split-bar">
+              <div
+                className="coastal-bar-ocean"
+                style={{ width: `${oceanFrac * 100}%` }}
+                title={`${(oceanFrac * 100).toFixed(0)}% ocean`}
+              />
+              <div
+                className="coastal-bar-land"
+                title={`${(landFrac * 100).toFixed(0)}% land`}
+              />
+            </div>
+            <div className="coastal-split-labels">
+              <span className="coastal-lbl-ocean">
+                🌊 {(oceanFrac * 100).toFixed(0)}% ocean
+              </span>
+              <span className="coastal-lbl-land">
+                🏡 {(landFrac * 100).toFixed(0)}% land
+              </span>
+            </div>
+          </div>
         </div>
       )}
     </div>
