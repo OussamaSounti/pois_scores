@@ -19,6 +19,8 @@ def test_score_dict_to_feature_row_keys_and_types() -> None:
         "by_category": {"Transport": 5, "Healthcare": 5},
         "accessibility_400m": {"bus_stop": True, "pharmacy": False},
         "nearest_km": {"Transport": 0.2, "Healthcare": 0.5},
+        "dist_coast_km": 0.35,
+        "land_buffer_fraction_1km": 0.78,
     }
     for k in ACCESSIBILITY_KEY_TYPES:
         if k not in scores["accessibility_400m"]:
@@ -54,6 +56,8 @@ def test_score_dict_to_feature_row_keys_and_types() -> None:
         assert isinstance(row[key], bool)
     assert row["acc_bus_stop"] is True
     assert row["acc_pharmacy"] is False
+    assert row["dist_coast_km"] == 0.35
+    assert row["land_buffer_fraction_1km"] == 0.78
 
 
 def test_score_dict_to_feature_row_default_computed_at() -> None:
@@ -85,3 +89,5 @@ def test_score_dict_to_feature_row_default_computed_at() -> None:
     assert row["aggregate_score"] is None
     assert row["by_category"] == {}
     assert row["nearest_km"] == {}
+    assert row["dist_coast_km"] is None
+    assert row["land_buffer_fraction_1km"] is None

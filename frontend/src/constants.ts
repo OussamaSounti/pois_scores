@@ -69,4 +69,11 @@ export const SCORE_TOOLTIPS: Record<string, string> = {
     'Whether key POI types (e.g. bus stop, pharmacy) are present within 400 m walk.',
   nearest_km: 'Distance in km from the location to the nearest POI in each category.',
   aggregate_score: 'Composite score 0–100 combining density, diversity, and accessibility.',
+  dist_coast_km:
+    'Geodesic distance (km) from this location to the nearest coastline. ' +
+    'Closer values indicate beachfront or seafront properties.',
+  land_buffer_fraction_1km:
+    'Fraction of the 1 km analysis buffer that lies on land (0.5–1.0). ' +
+    'Values below 1.0 mean part of the buffer extends into the sea; ' +
+    'the aggregate score density component is corrected for this.',
 };

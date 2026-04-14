@@ -15,6 +15,8 @@ function buildScoresCsv(results: BatchResult, rowMeta?: RowMeta[]): string {
     'entropy',
     'entropy_fclass',
     'aggregate_score',
+    'dist_coast_km',
+    'land_buffer_fraction_1km',
   ] as const;
 
   const allCatKeys = new Set<string>();
@@ -59,6 +61,8 @@ function buildScoresCsv(results: BatchResult, rowMeta?: RowMeta[]): string {
       s.entropy,
       s.entropy_fclass,
       s.aggregate_score ?? '',
+      s.dist_coast_km ?? '',
+      s.land_buffer_fraction_1km ?? '',
     ];
     const catVals = catKeys.map((k) => s.by_category?.[k] ?? '');
     const accVals = accKeys.map((k) => (s.accessibility_400m?.[k] ? '1' : '0'));
@@ -735,6 +739,8 @@ export default function BatchView({ onRowClick }: BatchViewProps) {
                   <th>POIs 400 m</th>
                   <th>Categories</th>
                   <th>Aggregate</th>
+                  <th>Dist coast (km)</th>
+                  <th>Land fraction 1 km</th>
                 </tr>
               </thead>
               <tbody>
@@ -765,6 +771,8 @@ export default function BatchView({ onRowClick }: BatchViewProps) {
                     <td>{r.scores.poi_count_400m}</td>
                     <td>{r.scores.n_categories}</td>
                     <td>{r.scores.aggregate_score != null ? r.scores.aggregate_score : '—'}</td>
+                    <td>{r.scores.dist_coast_km != null ? r.scores.dist_coast_km.toFixed(3) : '—'}</td>
+                    <td>{r.scores.land_buffer_fraction_1km != null ? (r.scores.land_buffer_fraction_1km * 100).toFixed(1) + '%' : '—'}</td>
                   </tr>
                 ))}
               </tbody>

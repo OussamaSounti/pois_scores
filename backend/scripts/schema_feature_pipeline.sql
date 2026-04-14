@@ -1,6 +1,41 @@
 -- Feature engineering pipeline: input/output. POI version from audit.pipeline_runs (external).
 -- Run once when adding the pipeline (local/dev) or schema is managed in production.
 CREATE SCHEMA IF NOT EXISTS production;
+CREATE SCHEMA IF NOT EXISTS geo;
+
+-- ---------------------------------------------------------------------------
+-- geo.coastline
+-- Holds the reference coastline geometry used to compute dist_coast_km.
+-- Populate with a single INSERT after running this script, e.g.:
+--   INSERT INTO geo.coastline (name, geom)
+--   VALUES ('morocco', ST_GeomFromGeoJSON('<GeoJSON MultiLineString>'));
+-- A GiST index is created for fast ST_Distance lookups.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS geo.coastline (
+    id   serial PRIMARY KEY,
+    name text,
+    geom geometry(MultiLineString, 4326) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_geo_coastline_geom
+    ON geo.coastline USING GIST (geom);
+
+-- ---------------------------------------------------------------------------
+-- geo.land
+-- Land polygon(s) used to compute the true fraction of the 1 km analysis
+-- buffer that lies on land via PostGIS area intersection.  This is more
+-- accurate than the straight-coastline formula for capes, peninsulas, bays,
+-- and other non-linear coastal shapes.
+-- Populate with: python scripts/load_land_polygons.py
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS geo.land (
+    id   serial PRIMARY KEY,
+    name text,
+    geom geometry(MultiPolygon, 4326) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_geo_land_geom
+    ON geo.land USING GIST (geom);
 
 -- Input: portfolio of properties (id, coordinates, optional metadata).
 CREATE TABLE IF NOT EXISTS production.properties (
@@ -40,7 +75,10 @@ CREATE TABLE IF NOT EXISTS production.property_features (
     acc_taxi boolean NOT NULL,
     -- Dynamic keys stored as JSONB (pandas/ML can read; stable schema)
     by_category jsonb NOT NULL DEFAULT '{}',
-    nearest_km jsonb NOT NULL DEFAULT '{}'
+    nearest_km  jsonb NOT NULL DEFAULT '{}',
+    -- Coastal signals (NULL when geo.coastline table is not yet populated)
+    dist_coast_km          double precision,
+    land_buffer_fraction_1km double precision
 );
 
 CREATE INDEX IF NOT EXISTS idx_property_features_poi_refreshed_at

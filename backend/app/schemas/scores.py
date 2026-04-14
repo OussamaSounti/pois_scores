@@ -66,6 +66,24 @@ class ScoresPayload(BaseModel):
         le=100,
         description="Optional aggregate score 0–100",
     )
+    dist_coast_km: float | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "Geodesic distance (km) to nearest coastline feature. "
+            "None when the geo.coastline table is not loaded."
+        ),
+    )
+    land_buffer_fraction_1km: float | None = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description=(
+            "Fraction of the 1 km buffer that lies on land (0.5–1.0). "
+            "Values below 1.0 indicate the property is within 1 km of the sea; "
+            "the density component of aggregate_score is corrected accordingly."
+        ),
+    )
 
 
 class ScoreResponse(BaseModel):

@@ -30,13 +30,19 @@ def _get_current_poi(session: Session) -> datetime:
 def _get_pending(
     session: Session, current_poi: datetime, limit: int, offset: int
 ) -> list[tuple[int, float, float]]:
-    """Properties that do not yet have a property_features row for current_poi."""
+    """Properties that need (re-)computation for the current POI version.
+    Includes properties with no feature row yet AND properties whose
+    dist_coast_km / land_buffer_fraction_1km are still NULL.
+    """
     sql = text("""
         SELECT p.id, p.latitude, p.longitude
         FROM production.properties p
         WHERE NOT EXISTS (
             SELECT 1 FROM production.property_features f
-            WHERE f.property_id = p.id AND f.poi_refreshed_at = :current_poi
+            WHERE f.property_id = p.id
+              AND f.poi_refreshed_at = :current_poi
+              AND f.dist_coast_km IS NOT NULL
+              AND f.land_buffer_fraction_1km IS NOT NULL
         )
         ORDER BY p.id
         LIMIT :limit OFFSET :offset
@@ -55,7 +61,10 @@ def _count_pending(session: Session, current_poi: datetime) -> int:
         FROM production.properties p
         WHERE NOT EXISTS (
             SELECT 1 FROM production.property_features f
-            WHERE f.property_id = p.id AND f.poi_refreshed_at = :current_poi
+            WHERE f.property_id = p.id
+              AND f.poi_refreshed_at = :current_poi
+              AND f.dist_coast_km IS NOT NULL
+              AND f.land_buffer_fraction_1km IS NOT NULL
         )
     """)
     return session.execute(sql, {"current_poi": current_poi}).scalar() or 0
@@ -94,6 +103,8 @@ def _upsert_rows(session: Session, rows: list[dict[str, Any]]) -> None:
         "acc_taxi",
         "by_category",
         "nearest_km",
+        "dist_coast_km",
+        "land_buffer_fraction_1km",
     ]
     placeholders = ", ".join(f":{c}" for c in cols)
     updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != "property_id")
