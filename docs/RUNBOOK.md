@@ -51,13 +51,13 @@ If you prefer not to exec into the running `db` service, use a one-off container
 
 ```bash
 # Custom .dump
-docker run --rm -v "C:\path\to\dumps:/dumps" --network pois_scores_default postgis/postgis:15-3.5-alpine pg_restore -h db -d poi_db -U poi_user -v /dumps/file.dump
+docker run --rm -v "C:\path\to\dumps:/dumps" --network pois_scores_v2_default postgis/postgis:16-3.5-alpine pg_restore -h db -d poi_db -U poi_user -v /dumps/file.dump
 
 # Plain .sql
-docker run --rm -v "C:\path\to\dumps:/dumps" --network pois_scores_default postgis/postgis:15-3.5-alpine psql -h db -d poi_db -U poi_user -f /dumps/file.sql
+docker run --rm -v "C:\path\to\dumps:/dumps" --network pois_scores_v2_default postgis/postgis:16-3.5-alpine psql -h db -d poi_db -U poi_user -f /dumps/file.sql
 ```
 
-Replace `pois_scores_default` with your Compose project network name (`docker network ls`).
+The network name is derived from the project directory name: `pois_scores_v2_default`. Verify with `docker network ls` if you have renamed or moved the directory.
 
 ## Inspect the schema (after restore)
 
@@ -80,6 +80,77 @@ Record the **actual** table and column names in [DATA_MODEL.md](DATA_MODEL.md) s
 - From host: `psql "postgresql://poi_user:poi_password@localhost:5432/poi_db"` (if `psql` is installed).
 - From another container on the same Compose network: use hostname `db`, port `5432`, and the same user/password/database.
 - Ensure `DATABASE_URL` in `.env` matches (user, password, host, port, database name).
+
+---
+
+## Load geo reference data (required once per fresh DB)
+
+Two reference tables must be populated before the feature pipeline can compute `dist_coast_km` and `land_buffer_fraction_1km`. Without them both columns are NULL for every property.
+
+Run these from the project root (Postgres must be up):
+
+```bash
+# 1. Morocco OSM coastline — populates geo.coastline (~2 992 segments)
+python scripts/load_osm_coastline.py
+
+# 2. Morocco land polygon — populates geo.land (OSM relation 3630439, ~17 k points)
+python scripts/load_osm_land.py
+```
+
+Both scripts default to `DATABASE_URL=postgresql://poi_user:poi_password@localhost:5432/poi_db`. Override with the env var if needed:
+
+```powershell
+$env:DATABASE_URL="postgresql://poi_user:poi_password@localhost:5432/poi_db"
+python scripts/load_osm_coastline.py
+python scripts/load_osm_land.py
+```
+
+After loading, run the pipeline normally (`docker compose run --rm pipeline`); it will reprocess any properties where either field is NULL.
+
+> **Scripts folder layout**
+> - `scripts/` (project root) — geo reference loaders (`load_osm_coastline.py`, `load_osm_land.py`). Run from the project root.
+> - `backend/scripts/` — application scripts that depend on the Python package (`load_properties_from_parquet.py`, schema runners). Run from `backend/` or via `docker compose run --rm backend python scripts/…`.
+
+---
+
+## Load properties from Parquet to be able to visualise the results or run the pipline on a parquet file that contains the proprties you want to calculate the scores for
+
+The `production.properties` table is populated from a Parquet file of real-estate transactions. The script automatically adds any missing columns to the table the first time it runs.
+
+```bash
+cd backend
+python scripts/load_properties_from_parquet.py \
+  --parquet ../input/casablanca_transactions_sample.parquet
+```
+
+Key options:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--parquet` | *(required)* | Path to the `.parquet` file |
+| `--batch-size` | `500` | Rows per upsert batch |
+| `--dry-run` | off | Parse and validate only; no DB writes |
+
+The script reads `DATABASE_URL` from the environment (or from `.env` in `backend/`). On first run it `ALTER TABLE production.properties ADD COLUMN …` for every transaction/asset/geo column present in the Parquet file that does not yet exist in the DB. Subsequent runs upsert rows using `transaction_id` as the conflict key.
+
+---
+
+## pgAdmin (local)
+
+pgAdmin is included in `docker-compose.yml` and starts automatically with `docker compose up -d`.
+
+- **URL:** http://localhost:5050
+- **Login:** `admin@admin.com` / `admin`
+
+To connect to the database, add a new server in pgAdmin:
+
+| Field | Value |
+|-------|-------|
+| Host | `db` |
+| Port | `5432` |
+| Database | `poi_db` |
+| Username | `poi_user` |
+| Password | `poi_password` |
 
 ---
 

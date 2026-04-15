@@ -31,6 +31,20 @@ services:
       db:
         condition: service_healthy
 
+  #pgadmin to be able to inspect the databse on the pgadmin web interface 
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
   pipeline:
     profiles:
       - pipeline
@@ -48,3 +62,4 @@ services:
 
 volumes:
   postgres_data:
+  pgadmin_data:
