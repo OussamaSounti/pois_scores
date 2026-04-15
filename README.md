@@ -35,22 +35,39 @@ Use the `main` branch as default; use feature branches and Merge Requests for ch
    ```
    Edit `.env` if you change the DB user, password, or database name (they must match `docker-compose.yml` and the restore step).
 
-2. **Start the stack (DB + backend)**
+2. **Start the stack (DB + backend + pgAdmin)**
    ```bash
    docker compose up -d
    ```
-   This starts the database and the backend API only (the pipeline service is not started by default; run it on demand with `docker compose run --rm pipeline`). Wait until both are up (`docker compose ps`). API: http://localhost:8000/docs
+   This starts the database, the backend API, and pgAdmin. The pipeline service is not started by default; run it on demand with `docker compose run --rm pipeline`. Wait until all are up (`docker compose ps`).
+
+   | Service | URL |
+   |---------|-----|
+   | Backend API + docs | http://localhost:8000/docs |
+   | pgAdmin | http://localhost:5050 (login: `admin@admin.com` / `admin`) |
 
    To start only Postgres (e.g. to restore the dump first):
    ```bash
    docker compose up -d db
    ```
 
-3. **Optional (local): restore a POI dump**
-   For local data, you can restore a PostgreSQL dump (`.dump` or `.sql`) after the first start. See [docs/RUNBOOK.md](docs/RUNBOOK.md) for commands. Production uses the existing DB; no restore.
+3. **Load geo reference data (required once)**
+   ```bash
+   python scripts/load_osm_coastline.py   # populates geo.coastline
+   python scripts/load_osm_land.py        # populates geo.land
+   ```
+   Without these, `dist_coast_km` and `land_buffer_fraction_1km` will be NULL for all properties. See [docs/RUNBOOK.md](docs/RUNBOOK.md#load-geo-reference-data-required-once-per-fresh-db).
 
-4. **Document the schema**
-   After restore, inspect tables in `psql` and record the actual table and column names in [docs/DATA_MODEL.md](docs/DATA_MODEL.md). The backend will use this to query POIs (no schema creation in code).
+4. **Optional (local): restore a POI dump and load properties**
+   For local data, restore a PostgreSQL dump (`.dump` or `.sql`) after the first start. Then load your properties Parquet file:
+   ```bash
+   cd backend
+   python scripts/load_properties_from_parquet.py --parquet ../input/your_file.parquet
+   ```
+   See [docs/RUNBOOK.md](docs/RUNBOOK.md) for full commands. Production uses the existing DB; no restore.
+
+5. **Document the schema**
+   After restore, inspect tables in `psql` and record any changes in [docs/DATA_MODEL.md](docs/DATA_MODEL.md). The backend will use this to query POIs (no schema creation in code).
 
 ## Run the API (local, without Docker)
 
@@ -89,6 +106,15 @@ The dashboard is a React app: left sidebar (coords + Run + metrics), center map,
 - **Export CSV** to download full scores (including `input_row` when loaded from a file).
 
 Set `VITE_API_URL` in `frontend/.env` to point to another API base (e.g. `http://localhost:8000`).
+
+## Scripts layout
+
+| Folder | Contents | When to use |
+|--------|----------|-------------|
+| `scripts/` | `load_osm_coastline.py`, `load_osm_land.py` | Geo reference data loaders — run from project root |
+| `backend/scripts/` | `load_properties_from_parquet.py`, schema SQL/runners | App scripts that depend on the Python package — run from `backend/` |
+
+---
 
 ## Feature engineering pipeline
 

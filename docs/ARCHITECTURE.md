@@ -55,8 +55,25 @@ High-level design and data flow for the dashboard, API, and database.
 | Component   | Role |
 |------------|------|
 | **Frontend** | React SPA; Single tab (map, metrics, POI list, section filters), Batch tab (input, file drop, results table, export CSV, row → Single). |
-| **Backend**  | FastAPI; `/health`, `/ready`, `/api/v1/scores`, `/api/v1/scores/batch`, `/api/v1/pois`; config via env (`DATABASE_URL`, `CORS_ORIGINS`). |
-| **Database** | PostgreSQL 15+ with PostGIS; table `production.pois_current` (and audit/staging). Production = existing DB; local/dev = dump or init script. |
+| **Backend**  | FastAPI; see full endpoint list below; config via env (`DATABASE_URL`, `CORS_ORIGINS`). |
+| **Database** | PostgreSQL 15+ with PostGIS; table `production.pois_current` (and audit/staging/geo). Production = existing DB; local/dev = dump or init script. |
+
+## API endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Liveness :  `{"status": "ok"}` |
+| GET | `/ready` | Readiness to checks DB connectivity. 503 if unreachable |
+| GET | `/metrics` | Prometheus metrics (not in OpenAPI schema) |
+| GET | `/api/v1/scores` | (query params `lat`, `lon`) Single-location POI score  |
+| POST | `/api/v1/scores` | POI score for asingle location (JSON body) |
+| POST | `/api/v1/scores/batch` | Batch POI scores (max 500 locations) |
+| GET | `/api/v1/pois` | POIs within radius for map/list display |
+| GET | `/api/v1/properties` | Property markers in bbox with latest feature payload. supports admin hierarchy filters (`district_uid`, `neighbourhood_uid`, `iris_uid`, `ilot_uid`) |
+| GET | `/api/v1/properties/stats` | Grouped avg scores by admin level (`district`/`neighbourhood`/`iris`/`ilot`) |
+| GET | `/api/v1/properties/{id}` | Single property with full feature payload |
+| GET | `/api/v1/geo/land` | `geo.land` (map overlay / verification)  Morocco polygon as GeoJSON |
+| GET | `/api/v1/geo/coastline` | `geo.coastline` (map overlay / verification) OSM coastline segments as GeoJSON  |
 
 ## Configuration and “real” database
 

@@ -70,3 +70,4 @@ data/*.sql
 *.log
 tmp/
 temp/
+/data/

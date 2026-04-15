@@ -54,6 +54,8 @@ The dump also includes **audit**, **geo**, and **staging** schemas. The API is b
 ### `geo`
 
 - **geo.city_polygons**: id, name, fclass, geom (MultiPolygon)
+- **geo.coastline**: id, name, geom (MultiLineString, 4326) — OSM coastline segments for Morocco. Required for calculating the `dist_coast_km` and `land_buffer_fraction_1km` computations. Load with `python scripts/load_osm_coastline.py`.
+- **geo.land**: id, name, geom (MultiPolygon, 4326) — Morocco land polygon. Required for checking if `_is_on_land`  (used when a property is > 1 km from the coast). Load with `python scripts/load_osm_land.py`.
 
 ### `staging`
 
@@ -81,16 +83,35 @@ These tables are **not** in the dump; they are created by the script [schema_fea
 
 ### `production.properties` (input)
 
-Portfolio of properties; each row is one location to score.
+Portfolio of real-estate records for checking and verifications; each row is one property location to score. Populated by running `python backend/scripts/load_properties_from_parquet.py` (see [RUNBOOK](RUNBOOK.md#load-properties-from-parquet)). The pipeline only reads from this table.
 
-| Column     | Type             | Description        |
-|------------|------------------|--------------------|
-| id         | bigint           | Primary key        |
-| latitude   | double precision | NOT NULL           |
-| longitude  | double precision | NOT NULL           |
-| metadata   | jsonb            | Optional metadata  |
+| Column               | Type             | Nullable | Description |
+|----------------------|------------------|----------|-------------|
+| id                   | bigint           | NOT NULL | Primary key |
+| latitude             | double precision | NOT NULL | WGS84 latitude |
+| longitude            | double precision | NOT NULL | WGS84 longitude |
+| metadata             | jsonb            | YES      | Arbitrary key-value metadata |
+| transaction_id       | text             | YES      | Source transaction identifier |
+| transaction_date     | date             | YES      | Date of the transaction |
+| transaction_year     | integer          | YES      | Year extracted from transaction_date |
+| transaction_month    | integer          | YES      | Month extracted from transaction_date |
+| transaction_quarter  | integer          | YES      | Quarter extracted from transaction_date |
+| asset_price          | numeric          | YES      | Transaction price (MAD) |
+| asset_surface        | numeric          | YES      | Floor area (m²) |
+| asset_psqm           | numeric          | YES      | Price per m² (MAD/m²) |
+| asset_rooms          | integer          | YES      | Number of rooms |
+| asset_floor          | integer          | YES      | Floor number |
+| asset_type           | text             | YES      | Asset type (e.g. apartment, villa) |
+| district_uid         | text             | YES      | Admin district UID (join key) |
+| district_name        | text             | YES      | Admin district name |
+| neighbourhood_uid    | text             | YES      | Neighbourhood UID |
+| neighbour_name       | text             | YES      | Neighbourhood name |
+| iris_uid             | text             | YES      | IRIS zone UID |
+| iris_code            | text             | YES      | IRIS zone code |
+| ilot_uid             | text             | YES      | Îlot UID |
+| ilot_objectid        | text             | YES      | Îlot object ID |
 
-Populated by your ETL or admin process; the pipeline only reads from this table.
+The four `*_uid` columns (`district_uid`, `neighbourhood_uid`, `iris_uid`, `ilot_uid`) power the hierarchy drill-down in `/api/v1/properties/stats` and `/api/v1/properties ` map filter .
 
 **POI version (for the feature pipeline):** The pipeline uses **`audit.pipeline_runs.run_timestamp`** (e.g. `max(run_timestamp)`) as the current POI version. That table is maintained by the external POI refresh pipeline; this app does not write to it.
 
@@ -105,9 +126,11 @@ One row per property; each column is a spatial indicator. The ML team reads this
 | pipeline_version  | text      | Version of the pipeline that wrote the row. |
 | computed_at       | timestamptz | When the row was computed. |
 | poi_count_1km, poi_count_400m, n_categories, n_poi_types, entropy, entropy_fclass, aggregate_score | scalars | Same as API score payload. |
-| acc_bus_stop, acc_pharmacy, … (14 booleans) | boolean | Accessibility flags within 400 m. |
+| acc_bus_stop, acc_pharmacy, … (13 booleans) | boolean | Accessibility flags within 400 m (bus_stop, pharmacy, school, hospital, supermarket, bank, atm, clinic, fuel, police, park, doctors, taxi). |
 | by_category       | jsonb     | POI count per super_category (1 km). |
 | nearest_km        | jsonb     | Distance in km to nearest POI per super_category. |
+| dist_coast_km     | numeric   | distance in (km) to nearest OSM coastline segment. NULL when `geo.coastline` is not loaded. |
+| land_buffer_fraction_1km | numeric | Fraction of the 1 km analysis buffer that lies on land (0.0–1.0). can be Used to normalise density for coastal properties and its kept for future testing to see the impact in the estimation of the price. NULL when `geo.coastline`/`geo.land` are not loaded. |
 
 Index: `property_features(poi_refreshed_at)` for “pending” queries. When the POI dataset is refreshed, the pipeline recomputes all properties and overwrites rows (one row per property_id); `poi_refreshed_at` records the POI version timestamp used (from audit.pipeline_runs).
 

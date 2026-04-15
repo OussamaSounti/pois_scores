@@ -20,6 +20,17 @@ class PropertyScoresOut(BaseModel):
     accessibility_400m: dict[str, bool] = Field(default_factory=dict)
     by_category: dict[str, float] = Field(default_factory=dict)
     nearest_km: dict[str, float] = Field(default_factory=dict)
+    dist_coast_km: float | None = Field(
+        default=None,
+        ge=0,
+        description="distance to nearest coeastline (km) or None when geo.coastline is not loaded.",
+    )
+    land_buffer_fraction_1km: float | None = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description="Fraction of the 1 km buffer on land. Below 1.0 means the property is within 1 km of the sea",
+    )
 
 
 class PropertyMapItemOut(BaseModel):
