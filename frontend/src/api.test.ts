@@ -20,10 +20,15 @@ describe('api', () => {
         n_poi_types: 5,
         entropy: 1.5,
         entropy_fclass: 2.0,
+        entropy_norm: 0,
+        entropy_fclass_norm: 0,
         by_category: {},
         accessibility_400m: {},
         nearest_km: {},
         aggregate_score: 42,
+        dist_coast_km: null,
+        land_buffer_fraction_1km: null,
+        poi_source: null,
       },
     };
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({

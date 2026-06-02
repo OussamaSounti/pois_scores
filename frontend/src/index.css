@@ -195,6 +195,24 @@ body {
 .empty-state .icon { font-size: 36px; opacity: 0.35; }
 .empty-state p { font-size: 11px; line-height: 1.7; }
 
+.poi-source-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.poi-source-banner::before { font-size: 13px; }
+.poi-source-current { color: var(--text-muted); background: transparent; }
+.poi-source-current::before { content: '🟢'; }
+.poi-source-history { color: #1a7fa8; background: rgba(26,127,168,0.08); border-bottom-color: rgba(26,127,168,0.25); }
+.poi-source-history::before { content: '🕐'; }
+
 .metric-filter-bar {
   display: flex;
   align-items: center;
@@ -291,22 +309,24 @@ body {
 .map-wrap .leaflet-container { width: 100% !important; height: 100% !important; min-height: 300px; }
 
 /* Geo overlay toggle buttons */
-.geo-overlay-btns { position: absolute; top: 10px; right: 54px; z-index: 1000; display: flex; gap: 6px; }
+.geo-overlay-btns { position: absolute; top: 10px; right: 54px; z-index: 1000; display: flex; gap: 8px; }
 .geo-toggle-btn {
-  background: rgba(20,22,32,0.88);
+  background: rgba(255,255,255,0.92);
   color: var(--text-mid);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: 6px;
-  padding: 5px 10px;
-  font-size: 10px;
+  padding: 8px 14px;
+  font-size: 11px;
   font-family: var(--font-m);
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
+  font-weight: 500;
   cursor: pointer;
-  backdrop-filter: blur(4px);
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  backdrop-filter: blur(6px);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
-.geo-toggle-btn:hover { background: rgba(30,157,101,0.18); color: var(--text); }
-.geo-toggle-btn.active { background: rgba(30,157,101,0.25); color: #1e9d65; border-color: #1e9d65; }
+.geo-toggle-btn:hover { background: var(--panel2); color: var(--accent); border-color: var(--accent); box-shadow: 0 2px 8px rgba(41,194,92,0.15); }
+.geo-toggle-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 4px 12px rgba(41,194,92,0.3); }
 
 
 .map-hint {

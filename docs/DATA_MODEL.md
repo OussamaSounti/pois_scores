@@ -45,22 +45,18 @@ Use `latitude` / `longitude` for simple distance or bbox logic; use `geom` (and 
 
 The dump also includes **audit**, **geo**, and **staging** schemas. The API is built on **`production.pois_current`**; the tables below are for context and pipeline/ETL use.
 
-### `audit` — pipeline runs and history
+### `audit`
 
-- **audit.pipeline_runs**: run_id, run_timestamp, source_file, source_snapshot_date, pipeline_version, status, duration_seconds, notes
-- **audit.pois_history**: id, run_id, osm_id, change_type, name, fclass, super_category, latitude, longitude, geom, content_hash, valid_from, valid_to
-- **audit.run_stats**: run_id, total_raw, total_after_filter, inserted, updated, deactivated, reactivated, unchanged
+- **audit.pipeline_runs**: run_id, run_timestamp, source_file, source_snapshot_date, pipeline_version, status, duration_seconds, notes — queried by the pipeline to get the current POI version (`max(run_timestamp)`). Maintained by the external POI refresh pipeline; this app does not write to it.
 
 ### `geo`
 
-- **geo.city_polygons**: id, name, fclass, geom (MultiPolygon)
-- **geo.coastline**: id, name, geom (MultiLineString, 4326) — OSM coastline segments for Morocco. Required for calculating the `dist_coast_km` and `land_buffer_fraction_1km` computations. Load with `python scripts/load_osm_coastline.py`.
-- **geo.land**: id, name, geom (MultiPolygon, 4326) — Morocco land polygon. Required for checking if `_is_on_land`  (used when a property is > 1 km from the coast). Load with `python scripts/load_osm_land.py`.
+- **geo.coastline**: id, name, geom (MultiLineString, 4326) — OSM coastline segments for Morocco. Required for computing `dist_coast_km` and `land_buffer_fraction_1km`. Load with `python scripts/load_osm_coastline.py`.
+- **geo.land**: id, name, geom (MultiPolygon, 4326) — Morocco land polygon. Required for checking whether a point is on land. Load with `python scripts/load_osm_land.py`.
 
-### `staging`
+### `osm_history`
 
-- **staging.pois_stage**: osm_id, name, fclass, super_category, latitude, longitude, geom, content_hash
-- **staging.raw_pois**: osm_id, name, fclass, latitude, longitude, geom, source_layer
+- **osm_history.poi_history_active**: versioned POI snapshots used by the `as_of` parameter on score endpoints. Populated by running `python data/import_data.py`. The schema is created by `schema_feature_pipeline.sql`; the table is created and populated by the import script. When not loaded, `as_of` requests fall back to `production.pois_current`.
 
 ---
 
@@ -84,6 +80,8 @@ These tables are **not** in the dump; they are created by the script [schema_fea
 ### `production.properties` (input)
 
 Portfolio of real-estate records for checking and verifications; each row is one property location to score. Populated by running `python backend/scripts/load_properties_from_parquet.py` (see [RUNBOOK](RUNBOOK.md#load-properties-from-parquet)). The pipeline only reads from this table.
+
+> **Local/dev note:** `schema_feature_pipeline.sql` creates a minimal version of this table with only `id`, `latitude`, `longitude`, and `metadata`. The full column set below reflects the production table and what `load_properties_from_parquet.py` populates.
 
 | Column               | Type             | Nullable | Description |
 |----------------------|------------------|----------|-------------|
@@ -125,12 +123,20 @@ One row per property; each column is a spatial indicator. The ML team reads this
 | poi_refreshed_at  | timestamptz | POI version used to compute this row; **use for reproducibility** (e.g. train and evaluate on same version). |
 | pipeline_version  | text      | Version of the pipeline that wrote the row. |
 | computed_at       | timestamptz | When the row was computed. |
-| poi_count_1km, poi_count_400m, n_categories, n_poi_types, entropy, entropy_fclass, aggregate_score | scalars | Same as API score payload. |
+| poi_count_1km     | integer   | Number of POIs within 1 km. |
+| poi_count_400m    | integer   | Number of POIs within 400 m. |
+| n_categories      | integer   | Number of distinct super_categories within 1 km. |
+| n_poi_types       | integer   | Number of distinct fclass values within 1 km. |
+| entropy           | double precision | Shannon entropy of super_category distribution (bits). |
+| entropy_fclass    | double precision | Shannon entropy of fclass distribution (bits). |
+| aggregate_score   | double precision | Aggregate POI score 0–100 (NULL if not computed). |
 | acc_bus_stop, acc_pharmacy, … (13 booleans) | boolean | Accessibility flags within 400 m (bus_stop, pharmacy, school, hospital, supermarket, bank, atm, clinic, fuel, police, park, doctors, taxi). |
 | by_category       | jsonb     | POI count per super_category (1 km). |
 | nearest_km        | jsonb     | Distance in km to nearest POI per super_category. |
-| dist_coast_km     | numeric   | distance in (km) to nearest OSM coastline segment. NULL when `geo.coastline` is not loaded. |
-| land_buffer_fraction_1km | numeric | Fraction of the 1 km analysis buffer that lies on land (0.0–1.0). can be Used to normalise density for coastal properties and its kept for future testing to see the impact in the estimation of the price. NULL when `geo.coastline`/`geo.land` are not loaded. |
+| dist_coast_km     | double precision | Distance in km to nearest OSM coastline segment. NULL when `geo.coastline` is not loaded. |
+| land_buffer_fraction_1km | double precision | Fraction of the 1 km analysis buffer that lies on land (0.0–1.0). Used to normalise density for coastal properties. NULL when `geo.coastline`/`geo.land` are not loaded. |
+| transaction_date  | date      | Date used for temporal POI lookup. NULL when scored against the current POI snapshot. |
+| poi_source        | text      | `'history'` when scored from `osm_history.poi_history_active`; `'current'` when scored from `production.pois_current`. |
 
 Index: `property_features(poi_refreshed_at)` for “pending” queries. When the POI dataset is refreshed, the pipeline recomputes all properties and overwrites rows (one row per property_id); `poi_refreshed_at` records the POI version timestamp used (from audit.pipeline_runs).
 

@@ -1,15 +1,24 @@
 """Pydantic schemas for score API request/response."""
 
+from datetime import date
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class LocationIn(BaseModel):
-    """Single location input (lat, lon)."""
+    """Single location input (lat, lon, optional as_of date)."""
 
     model_config = ConfigDict(extra="forbid")
 
     lat: float = Field(..., ge=-90, le=90, description="Latitude")
     lon: float = Field(..., ge=-180, le=180, description="Longitude")
+    as_of: date | None = Field(
+        default=None,
+        description=(
+            "Optional date (YYYY-MM-DD) to score the location using the historical "
+            "POI snapshot at that date. When omitted, the current POI snapshot is used."
+        ),
+    )
 
 
 class LocationBatchItem(BaseModel):
@@ -22,6 +31,13 @@ class LocationBatchItem(BaseModel):
     id: str | int | None = Field(
         default=None,
         description="Optional client id for correlation; not echoed (results in same order)",
+    )
+    as_of: date | None = Field(
+        default=None,
+        description=(
+            "Optional date (YYYY-MM-DD) to score this location using the historical "
+            "POI snapshot at that date. Per-item override for batch requests."
+        ),
     )
 
 
@@ -43,10 +59,28 @@ class ScoresPayload(BaseModel):
     poi_count_400m: int = Field(..., description="Number of POIs within 400 m")
     n_categories: int = Field(..., description="Number of distinct super_categories in 1 km")
     n_poi_types: int = Field(..., description="Number of distinct fclass values in 1 km")
-    entropy: float = Field(..., description="Shannon entropy of category distribution in 1 km")
+    entropy: float = Field(..., description="Shannon entropy of category distribution in 1 km (bits)")
     entropy_fclass: float = Field(
         ...,
-        description="Shannon entropy of fclass (POI type) distribution within 1 km",
+        description="Shannon entropy of fclass (POI type) distribution within 1 km (bits)",
+    )
+    entropy_norm: float = Field(
+        0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Pielou's J evenness index for super_category: H / log2(n_categories). "
+            "0 = all POIs in one category, 1 = perfectly even spread."
+        ),
+    )
+    entropy_fclass_norm: float = Field(
+        0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Pielou's J evenness index for fclass: H_fclass / log2(n_poi_types). "
+            "0 = all POIs of one type, 1 = perfectly even spread."
+        ),
     )
     by_category: dict[str, int] = Field(
         default_factory=dict,
@@ -82,6 +116,13 @@ class ScoresPayload(BaseModel):
             "Fraction of the 1 km buffer that lies on land (0.5–1.0). "
             "Values below 1.0 indicate the property is within 1 km of the sea; "
             "the density component of aggregate_score is corrected accordingly."
+        ),
+    )
+    poi_source: str | None = Field(
+        default=None,
+        description=(
+            "'history' when scored from osm_history.poi_history_active at a specific date; "
+            "'current' or None when scored from production.pois_current."
         ),
     )
 

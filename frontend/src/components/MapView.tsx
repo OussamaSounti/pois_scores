@@ -107,19 +107,8 @@ export default function MapView({
   const mapCenter = center ?? MOROCCO_CENTER;
   const mapZoom = center ? LOCATION_ZOOM : MOROCCO_ZOOM;
   const markerRefs = useRef<Record<number, L.Marker | null>>({});
-  const [showLand, setShowLand] = useState(false);
   const [showCoastline, setShowCoastline] = useState(false);
-  const [landGeo, setLandGeo] = useState<FeatureCollection | null>(null);
   const [coastlineGeo, setCoastlineGeo] = useState<FeatureCollection | null>(null);
-
-  useEffect(() => {
-    if (showLand && !landGeo) {
-      fetch('/api/v1/geo/land')
-        .then((r) => r.json())
-        .then(setLandGeo)
-        .catch(console.error);
-    }
-  }, [showLand, landGeo]);
 
   useEffect(() => {
     if (showCoastline && !coastlineGeo) {
@@ -135,13 +124,6 @@ export default function MapView({
       <div className="map-inner">
         {/* Geo overlay toggles */}
         <div className="geo-overlay-btns">
-          <button
-            className={`geo-toggle-btn${showLand ? ' active' : ''}`}
-            onClick={() => setShowLand((v) => !v)}
-            title="Toggle land polygon (geo.land)"
-          >
-            Land polygon
-          </button>
           <button
             className={`geo-toggle-btn${showCoastline ? ' active' : ''}`}
             onClick={() => setShowCoastline((v) => !v)}
@@ -161,13 +143,6 @@ export default function MapView({
           <TileLayer url={CARTO_URL} attribution={CARTO_ATTR} maxZoom={19} />
           <DblClickHandler onLocation={onLocationSelect} />
           {/* Geo verification layers */}
-          {showLand && landGeo && (
-            <GeoJSON
-              key="land"
-              data={landGeo}
-              style={{ color: '#1e9d65', weight: 2, fillColor: '#1e9d65', fillOpacity: 0.12 }}
-            />
-          )}
           {showCoastline && coastlineGeo && (
             <GeoJSON
               key="coastline"

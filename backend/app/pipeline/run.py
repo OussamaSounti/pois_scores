@@ -3,7 +3,7 @@
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 from sqlalchemy import text
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session_factory
 from app.pipeline.mapper import score_dict_to_feature_row
-from app.services.spatial import compute_scores
+from app.services.spatial import compute_scores, compute_scores_at_date
 
 logger = logging.getLogger(__name__)
 
@@ -29,18 +29,29 @@ def _get_current_poi(session: Session) -> datetime:
 
 def _get_pending(
     session: Session, current_poi: datetime, limit: int, offset: int
-) -> list[tuple[int, float, float]]:
-    """Properties that need (re-)computation for the current POI version.
-    Includes properties with no feature row yet AND properties whose
-    dist_coast_km / land_buffer_fraction_1km are still NULL.
+) -> list[tuple[int, float, float, date | None]]:
+    """Properties that need (re-)computation.
+
+    For properties WITH a transaction_date the reference POI timestamp is the
+    transaction_date itself (cast to timestamptz midnight UTC).
+    For properties WITHOUT a transaction_date the reference is the current POI
+    refresh timestamp from audit.pipeline_runs.
+
+    A property is considered done when property_features already has a row
+    whose poi_refreshed_at matches the reference timestamp AND the coastal
+    features have been computed (non-NULL).
     """
     sql = text("""
-        SELECT p.id, p.latitude, p.longitude
+        SELECT p.id, p.latitude, p.longitude, p.transaction_date
         FROM production.properties p
         WHERE NOT EXISTS (
             SELECT 1 FROM production.property_features f
             WHERE f.property_id = p.id
-              AND f.poi_refreshed_at = :current_poi
+              AND f.poi_refreshed_at = CASE
+                  WHEN p.transaction_date IS NOT NULL
+                      THEN p.transaction_date::timestamptz
+                  ELSE :current_poi
+              END
               AND f.dist_coast_km IS NOT NULL
               AND f.land_buffer_fraction_1km IS NOT NULL
         )
@@ -51,7 +62,7 @@ def _get_pending(
         sql,
         {"current_poi": current_poi, "limit": limit, "offset": offset},
     ).fetchall()
-    return [(r.id, float(r.latitude), float(r.longitude)) for r in rows]
+    return [(r.id, float(r.latitude), float(r.longitude), r.transaction_date) for r in rows]
 
 
 def _count_pending(session: Session, current_poi: datetime) -> int:
@@ -62,7 +73,11 @@ def _count_pending(session: Session, current_poi: datetime) -> int:
         WHERE NOT EXISTS (
             SELECT 1 FROM production.property_features f
             WHERE f.property_id = p.id
-              AND f.poi_refreshed_at = :current_poi
+              AND f.poi_refreshed_at = CASE
+                  WHEN p.transaction_date IS NOT NULL
+                      THEN p.transaction_date::timestamptz
+                  ELSE :current_poi
+              END
               AND f.dist_coast_km IS NOT NULL
               AND f.land_buffer_fraction_1km IS NOT NULL
         )
@@ -74,8 +89,6 @@ def _upsert_rows(session: Session, rows: list[dict[str, Any]]) -> None:
     """Insert or update property_features for the given rows."""
     if not rows:
         return
-    # Build one upsert per row (could be batched with executemany + ON CONFLICT)
-    # PostgreSQL: INSERT ... ON CONFLICT (property_id) DO UPDATE
     cols = [
         "property_id",
         "poi_refreshed_at",
@@ -105,6 +118,8 @@ def _upsert_rows(session: Session, rows: list[dict[str, Any]]) -> None:
         "nearest_km",
         "dist_coast_km",
         "land_buffer_fraction_1km",
+        "transaction_date",
+        "poi_source",
     ]
     placeholders = ", ".join(f":{c}" for c in cols)
     updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != "property_id")
@@ -124,6 +139,12 @@ def _upsert_rows(session: Session, rows: list[dict[str, Any]]) -> None:
 def run_pipeline(chunk_size: int = CHUNK_SIZE) -> int:
     """
     Process all pending properties: compute scores and upsert into property_features.
+
+    Properties that have a transaction_date are scored against
+    osm_history.poi_history_active at that date (temporal mode).
+    Properties without a transaction_date are scored against
+    production.pois_current (current mode).
+
     Returns total number of properties processed.
     """
     session_factory = get_session_factory()
@@ -152,11 +173,30 @@ def run_pipeline(chunk_size: int = CHUNK_SIZE) -> int:
                 break
             start = datetime.now(timezone.utc)
             rows: list[dict[str, Any]] = []
-            for prop_id, lat, lon in chunk:
+            for prop_id, lat, lon, transaction_date in chunk:
                 try:
-                    scores = compute_scores(session, lat, lon)
+                    if transaction_date is not None:
+                        scores = compute_scores_at_date(session, lat, lon, transaction_date)
+                        poi_ref = datetime(
+                            transaction_date.year,
+                            transaction_date.month,
+                            transaction_date.day,
+                            tzinfo=timezone.utc,
+                        )
+                        src = "history"
+                    else:
+                        scores = compute_scores(session, lat, lon)
+                        poi_ref = current_poi
+                        src = "current"
+
                     row = score_dict_to_feature_row(
-                        prop_id, scores, current_poi, PIPELINE_VERSION, computed_at
+                        prop_id,
+                        scores,
+                        poi_ref,
+                        PIPELINE_VERSION,
+                        computed_at,
+                        transaction_date=transaction_date,
+                        poi_source=src,
                     )
                     rows.append(row)
                 except Exception as e:

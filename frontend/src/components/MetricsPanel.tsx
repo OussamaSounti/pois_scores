@@ -11,9 +11,10 @@ type Props = {
   activeFilter?: PoiFilterItem;
   onItemClick?: (section: 'category_density' | 'accessibility' | 'nearest', value: string) => void;
   onClearFilter?: () => void;
+  asOfDate?: string;
 };
 
-export default function MetricsPanel({ data, activeFilter, onItemClick, onClearFilter }: Props) {
+export default function MetricsPanel({ data, activeFilter, onItemClick, onClearFilter, asOfDate }: Props) {
   if (!data) {
     return (
       <div className="metrics-panel">
@@ -28,6 +29,7 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
   }
 
   const s = data.scores;
+  const isHistorical = s.poi_source === 'history';
   const byCat = Object.entries(s.by_category).sort((a, b) => b[1] - a[1]);
   const maxD = Math.max(1, ...byCat.map(([, v]) => v));
   const nearest = Object.entries(s.nearest_km).sort((a, b) => a[1] - b[1]);
@@ -63,6 +65,12 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
 
   return (
     <div className="metrics-panel">
+      {/* POI data source banner — shown whenever a result is available */}
+      <div className={`poi-source-banner ${isHistorical ? 'poi-source-history' : 'poi-source-current'}`}>
+        {isHistorical
+          ? `Historical POIs${asOfDate ? ` · ${asOfDate}` : ''}`
+          : 'Current POI snapshot'}
+      </div>
       {activeFilter && onClearFilter && (
         <div className="metric-filter-bar">
           <span className="metric-filter-label">Showing: {filterLabel}</span>
@@ -115,19 +123,19 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
         <div className="kpi-row">
           <div className="kpi-card">
             <div className="kpi-label">
-              Entropy (category)
+              Diversity (category)
               <Tooltip text={SCORE_TOOLTIPS.entropy} />
             </div>
-            <div className="kpi-value small">{s.entropy.toFixed(2)}</div>
-            <div className="kpi-sub">Shannon</div>
+            <div className="kpi-value small">{(s.entropy_norm * 100).toFixed(0)}%</div>
+            <div className="kpi-sub">{s.n_categories}/9 cats · {s.entropy.toFixed(2)} bits</div>
           </div>
           <div className="kpi-card">
             <div className="kpi-label">
-              Entropy (type)
+              Diversity (type)
               <Tooltip text={SCORE_TOOLTIPS.entropy_fclass} />
             </div>
-            <div className="kpi-value small">{s.entropy_fclass.toFixed(2)}</div>
-            <div className="kpi-sub">Shannon</div>
+            <div className="kpi-value small">{(s.entropy_fclass_norm * 100).toFixed(0)}%</div>
+            <div className="kpi-sub">{s.n_poi_types}/44 types · {s.entropy_fclass.toFixed(2)} bits</div>
           </div>
           {s.aggregate_score != null && (
             <div className="kpi-card">
@@ -175,7 +183,14 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
       )}
 
       <div className="metric-group" style={{ animationDelay: '0.14s' }}>
-        <div className="metric-group-title">
+        <div
+          className={`metric-group-title ${onItemClick ? 'metric-row-clickable' : ''} ${activeFilter?.section === 'accessibility' && activeFilter?.value === '__all__' ? 'metric-row-active' : ''}`}
+          role={onItemClick ? 'button' : undefined}
+          tabIndex={onItemClick ? 0 : undefined}
+          onClick={onItemClick ? () => onItemClick('accessibility', '__all__') : undefined}
+          onKeyDown={onItemClick ? (e) => e.key === 'Enter' && onItemClick('accessibility', '__all__') : undefined}
+          title={onItemClick ? 'Click to show all POIs within 400 m' : undefined}
+        >
           Accessibility · 400 m walk
           <Tooltip text={SCORE_TOOLTIPS.accessibility_400m} />
         </div>
@@ -319,7 +334,7 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
               {landFrac < 0.999 && (
                 <div className="coastal-correction-note">
                   <strong>{(oceanFrac * 100).toFixed(0)}%</strong> of the 1 km buffer
-                  extends into the ocean — density score auto‑corrected.
+                  extends into the ocean
                 </div>
               )}
             </div>
