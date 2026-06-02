@@ -61,9 +61,9 @@ export const SCORE_TOOLTIPS: Record<string, string> = {
     'Number of distinct super-categories (e.g. Transport, Healthcare) present within 1 km.',
   n_poi_types: 'Number of distinct POI types (fclass) within 1 km.',
   entropy:
-    'Shannon entropy of the category distribution within 1 km. Higher = more balanced mix of categories.',
+    'Category diversity (0–100%): H / log2(9), where 9 is the total number of POI super-categories in this dataset. Penalises both low richness (few category types present) and unevenness. 100% requires all 9 categories equally represented.',
   entropy_fclass:
-    'Shannon entropy of the POI-type (fclass) distribution within 1 km. Higher = more variety of types.',
+    'Type diversity (0–100%): H / log2(44), where 44 is the total number of distinct POI fclass types in the taxonomy. Penalises both low richness (few types present) and unevenness. 100% requires all 44 types equally represented.',
   by_category: 'Count of POIs per super-category within 1 km.',
   accessibility_400m:
     'Whether key POI types (e.g. bus stop, pharmacy) are present within 400 m walk.',

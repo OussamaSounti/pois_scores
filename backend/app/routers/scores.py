@@ -1,6 +1,7 @@
 """Single-location and batch POI score endpoints."""
 
 import logging
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -14,23 +15,37 @@ from app.schemas.scores import (
     ScoreResponse,
     ScoresPayload,
 )
-from app.services.spatial import compute_scores
+from app.services.spatial import compute_scores, compute_scores_at_date
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/scores", tags=["scores"])
+
+
+def _compute(db: Session, lat: float, lon: float, as_of: date | None) -> dict:
+    """Dispatch to temporal or current scoring based on whether as_of is provided."""
+    if as_of is not None:
+        return compute_scores_at_date(db, lat, lon, as_of)
+    return compute_scores(db, lat, lon)
 
 
 @router.get("", response_model=ScoreResponse)
 def get_score(
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
+    as_of: date | None = Query(
+        default=None,
+        description=(
+            "Optional date (YYYY-MM-DD) to score the location using the historical "
+            "POI snapshot at that date. When omitted, the current POI snapshot is used."
+        ),
+    ),
     db: Session = Depends(get_db),
 ) -> ScoreResponse:
-    """Get POI scores for a single location (query params)."""
+    """Get POI scores for a single location (query params). Pass as_of=YYYY-MM-DD for historical scoring."""
     try:
-        payload = compute_scores(db, lat, lon)
+        payload = _compute(db, lat, lon, as_of)
     except Exception as e:
-        logger.exception("Score computation failed for lat=%s lon=%s", lat, lon)
+        logger.exception("Score computation failed for lat=%s lon=%s as_of=%s", lat, lon, as_of)
         raise HTTPException(
             status_code=500,
             detail=f"Score computation failed: {e!s}",
@@ -46,11 +61,11 @@ def post_score(
     body: LocationIn,
     db: Session = Depends(get_db),
 ) -> ScoreResponse:
-    """Get POI scores for a single location (JSON body)."""
+    """Get POI scores for a single location (JSON body). Include as_of for historical scoring."""
     try:
-        payload = compute_scores(db, body.lat, body.lon)
+        payload = _compute(db, body.lat, body.lon, body.as_of)
     except Exception as e:
-        logger.exception("Score computation failed for lat=%s lon=%s", body.lat, body.lon)
+        logger.exception("Score computation failed for lat=%s lon=%s as_of=%s", body.lat, body.lon, body.as_of)
         raise HTTPException(
             status_code=500,
             detail=f"Score computation failed: {e!s}",
@@ -66,13 +81,13 @@ def post_score_batch(
     body: BatchScoresRequest,
     db: Session = Depends(get_db),
 ) -> BatchScoresResponse:
-    """Get POI scores for multiple locations. Results in same order as input (max 500)."""
+    """Get POI scores for multiple locations (max 500). Each item may include as_of for per-location historical scoring."""
     results = []
     for loc in body.locations:
         try:
-            payload = compute_scores(db, loc.lat, loc.lon)
+            payload = _compute(db, loc.lat, loc.lon, loc.as_of)
         except Exception as e:
-            logger.exception("Score computation failed for lat=%s lon=%s", loc.lat, loc.lon)
+            logger.exception("Score computation failed for lat=%s lon=%s as_of=%s", loc.lat, loc.lon, loc.as_of)
             raise HTTPException(
                 status_code=500,
                 detail=f"Score computation failed: {e!s}",

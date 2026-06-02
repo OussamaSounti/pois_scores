@@ -1,6 +1,6 @@
 """Unit tests for pipeline mapper (score_dict_to_feature_row)."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from app.pipeline.mapper import score_dict_to_feature_row
 from app.services.spatial import ACCESSIBILITY_KEY_TYPES
@@ -91,3 +91,36 @@ def test_score_dict_to_feature_row_default_computed_at() -> None:
     assert row["nearest_km"] == {}
     assert row["dist_coast_km"] is None
     assert row["land_buffer_fraction_1km"] is None
+    # Default temporal fields
+    assert row["transaction_date"] is None
+    assert row["poi_source"] == "current"
+
+
+def test_score_dict_to_feature_row_temporal_mode() -> None:
+    """Temporal fields are written correctly when a transaction_date is supplied."""
+    scores = {
+        "poi_count_1km": 5,
+        "poi_count_400m": 1,
+        "n_categories": 1,
+        "n_poi_types": 2,
+        "entropy": 0.9,
+        "entropy_fclass": 0.7,
+        "aggregate_score": 30.0,
+        "by_category": {"Transport": 5},
+        "accessibility_400m": {k: False for k in ACCESSIBILITY_KEY_TYPES},
+        "nearest_km": {"Transport": 0.4},
+        "poi_source": "history",
+    }
+    tx_date = date(2018, 3, 23)
+    poi_ref = datetime(2018, 3, 23, tzinfo=timezone.utc)
+    row = score_dict_to_feature_row(
+        property_id=99,
+        scores=scores,
+        current_poi=poi_ref,
+        pipeline_version="1.0",
+        transaction_date=tx_date,
+        poi_source="history",
+    )
+    assert row["transaction_date"] == tx_date
+    assert row["poi_source"] == "history"
+    assert row["poi_refreshed_at"] == poi_ref

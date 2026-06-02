@@ -280,7 +280,7 @@ function HierarchyPolygons({
 export default function PropertiesView({
   onGoToSingle,
 }: {
-  onGoToSingle?: (lat: number, lon: number) => void;
+  onGoToSingle?: (lat: number, lon: number, asOf?: string) => void;
 }) {
   const [bbox, setBbox] = useState<BoundsBox | null>(null);
   const [metric, setMetric] = useState<MetricKey>('aggregate_score');
@@ -561,7 +561,12 @@ export default function PropertiesView({
               pathOptions={{ color: markerColor(item, metric), fillOpacity: 0.75, weight: 1 }}
               eventHandlers={{
                 click: () => onSelectProperty(item.id),
-                dblclick: () => onGoToSingle?.(item.latitude, item.longitude),
+                dblclick: () =>
+                  onGoToSingle?.(
+                    item.latitude,
+                    item.longitude,
+                    item.transaction_date?.slice(0, 10) ?? undefined
+                  ),
               }}
             >
               <Popup maxWidth={260}>
@@ -621,6 +626,18 @@ export default function PropertiesView({
 
               <div className="metric-group" style={{ animationDelay: '0.07s' }}>
                 <div className="metric-group-title">Scores (non-aggregated)</div>
+                <div className="nearest-row">
+                  <div className="nearest-name">POI snapshot</div>
+                  <div className="nearest-dist">
+                    {selected.scores.transaction_date ?? 'current'}
+                  </div>
+                </div>
+                <div className="nearest-row">
+                  <div className="nearest-name">POI source</div>
+                  <div className="nearest-dist">
+                    {selected.scores.poi_source ?? 'n/a'}
+                  </div>
+                </div>
                 <div className="nearest-row">
                   <div className="nearest-name">POIs (1 km)</div>
                   <div className="nearest-dist">{selected.scores.poi_count_1km ?? 'n/a'}</div>

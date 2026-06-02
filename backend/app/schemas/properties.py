@@ -16,6 +16,8 @@ class PropertyScoresOut(BaseModel):
     n_poi_types: int | None = None
     entropy: float | None = None
     entropy_fclass: float | None = None
+    entropy_norm: float | None = Field(default=None, ge=0.0, le=1.0)
+    entropy_fclass_norm: float | None = Field(default=None, ge=0.0, le=1.0)
     aggregate_score: float | None = Field(default=None, ge=0, le=100)
     accessibility_400m: dict[str, bool] = Field(default_factory=dict)
     by_category: dict[str, float] = Field(default_factory=dict)
@@ -30,6 +32,17 @@ class PropertyScoresOut(BaseModel):
         ge=0,
         le=1,
         description="Fraction of the 1 km buffer on land. Below 1.0 means the property is within 1 km of the sea",
+    )
+    transaction_date: str | None = Field(
+        default=None,
+        description=(
+            "Transaction date used for temporal POI lookup (YYYY-MM-DD). "
+            "NULL when scores were computed against the current POI snapshot."
+        ),
+    )
+    poi_source: str | None = Field(
+        default=None,
+        description="'history' when scored from osm_history, 'current' when scored from production.pois_current.",
     )
 
 

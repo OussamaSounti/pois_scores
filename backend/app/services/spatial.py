@@ -3,10 +3,20 @@
 import math
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+
+# Total number of distinct super_category values present in the dataset
+# (verified by SELECT COUNT(DISTINCT super_category) across both
+# production.pois_current and osm_history.poi_history_active).
+N_SUPER_CATEGORIES = 9
+
+# Total number of distinct fclass values across production.pois_current
+# and osm_history.poi_history_active (verified by COUNT DISTINCT query).
+N_FCLASS_TYPES = 44
 
 # Key fclass values for accessibility (within 400 m)
 ACCESSIBILITY_KEY_TYPES = frozenset(
@@ -96,6 +106,47 @@ def get_pois_with_distance(
         ORDER BY dist_km
     """)
     rows = session.execute(sql, {"lat": lat, "lon": lon, "radius_m": radius_m}).fetchall()
+    return [
+        {
+            "id": r.id,
+            "name": r.name or "Unnamed",
+            "fclass": r.fclass,
+            "super_category": r.super_category,
+            "latitude": float(r.latitude),
+            "longitude": float(r.longitude),
+            "distance_km": round(float(r.dist_km), 4),
+        }
+        for r in rows
+    ]
+
+
+def get_pois_with_distance_at_date(
+    session: Session,
+    lat: float,
+    lon: float,
+    radius_m: float = 1000.0,
+    as_of: "date | datetime | None" = None,
+) -> list[dict[str, Any]]:
+    """Return POIs from osm_history.poi_history_active active at *as_of*, with distance_km."""
+    radius_m = max(0, min(radius_m, 25_000))
+    ts = _as_of_ts(as_of)  # type: ignore[arg-type]
+    sql = text("""
+        SELECT abs(hashtext(typed_id)) AS id,
+               name, fclass, super_category, lat AS latitude, lon AS longitude,
+               ST_Distance(
+                   geom::geography,
+                   ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
+               ) / 1000.0 AS dist_km
+        FROM osm_history.poi_history_active
+        WHERE :as_of <@ valid_range
+          AND ST_DWithin(
+            geom::geography,
+            ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
+            :radius_m
+          )
+        ORDER BY dist_km
+    """)
+    rows = session.execute(sql, {"as_of": ts, "lat": lat, "lon": lon, "radius_m": radius_m}).fetchall()
     return [
         {
             "id": r.id,
@@ -354,6 +405,12 @@ def compute_scores(session: Session, lat: float, lon: float) -> dict[str, Any]:
     total_1km = len(pois_1km)
     entropy = _entropy(dict(by_category), total_1km)
     entropy_fclass = _entropy(dict(by_fclass), total_1km)
+    n_cat = len(by_category)
+    n_type = len(fclasses_1km)
+    # Both diversity metrics normalise by the full fixed taxonomy size so that
+    # richness (how many types appear) is penalised alongside unevenness.
+    entropy_norm = min(1.0, round(entropy / math.log2(N_SUPER_CATEGORIES), 4))
+    entropy_fclass_norm = min(1.0, round(entropy_fclass / math.log2(N_FCLASS_TYPES), 4))
 
     accessibility_400m: dict[str, bool] = {}
     fclass_in_400m = {p.fclass for p in pois_400m}
@@ -406,14 +463,174 @@ def compute_scores(session: Session, lat: float, lon: float) -> dict[str, Any]:
     return {
         "poi_count_1km": total_1km,
         "poi_count_400m": len(pois_400m),
-        "n_categories": len(by_category),
-        "n_poi_types": len(fclasses_1km),
+        "n_categories": n_cat,
+        "n_poi_types": n_type,
         "entropy": round(entropy, 4),
         "entropy_fclass": round(entropy_fclass, 4),
+        "entropy_norm": entropy_norm,
+        "entropy_fclass_norm": entropy_fclass_norm,
         "by_category": dict(by_category),
         "accessibility_400m": accessibility_400m,
         "nearest_km": nearest_km,
         "aggregate_score": agg,
         "dist_coast_km": dist_coast,
         "land_buffer_fraction_1km": round(land_frac_1km, 4),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Temporal variants — query osm_history.poi_history_active
+# ---------------------------------------------------------------------------
+
+def _as_of_ts(as_of: date | datetime) -> datetime:
+    """Normalise a date or datetime to a timezone-aware datetime for SQL binding."""
+    if isinstance(as_of, datetime):
+        return as_of if as_of.tzinfo else as_of.replace(tzinfo=timezone.utc)
+    # date → midnight UTC
+    return datetime(as_of.year, as_of.month, as_of.day, tzinfo=timezone.utc)
+
+
+def query_pois_radius_at_date(
+    session: Session,
+    lat: float,
+    lon: float,
+    radius_m: float,
+    as_of: date | datetime,
+) -> list[PoiRow]:
+    """Return POIs from osm_history.poi_history_active that were active at *as_of* within radius_m."""
+    radius_m = max(0, min(radius_m, 100_000))
+    ts = _as_of_ts(as_of)
+    sql = text("""
+        SELECT typed_id AS id, name, fclass, super_category, lat AS latitude, lon AS longitude
+        FROM osm_history.poi_history_active
+        WHERE :as_of <@ valid_range
+          AND ST_DWithin(
+            geom::geography,
+            ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
+            :radius_m
+          )
+    """)
+    rows = session.execute(sql, {"as_of": ts, "lat": lat, "lon": lon, "radius_m": radius_m}).fetchall()
+    return [
+        PoiRow(
+            id=r.id,
+            name=r.name or "Unnamed",
+            fclass=r.fclass,
+            super_category=r.super_category,
+            latitude=float(r.latitude),
+            longitude=float(r.longitude),
+        )
+        for r in rows
+    ]
+
+
+def _nearest_km_by_category_at_date(
+    session: Session,
+    lat: float,
+    lon: float,
+    as_of: date | datetime,
+    max_radius_m: float = 25_000,
+) -> dict[str, float]:
+    """Min distance in km to nearest POI per super_category at *as_of* (temporal history)."""
+    ts = _as_of_ts(as_of)
+    sql = text("""
+        SELECT super_category,
+               MIN(ST_Distance(
+                   geom::geography,
+                   ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
+               )) / 1000.0 AS dist_km
+        FROM osm_history.poi_history_active
+        WHERE :as_of <@ valid_range
+          AND ST_DWithin(
+            geom::geography,
+            ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
+            :max_radius_m
+          )
+        GROUP BY super_category
+    """)
+    rows = session.execute(
+        sql,
+        {"as_of": ts, "lat": lat, "lon": lon, "max_radius_m": max_radius_m},
+    ).fetchall()
+    return {r.super_category: round(float(r.dist_km), 4) for r in rows}
+
+
+def compute_scores_at_date(
+    session: Session,
+    lat: float,
+    lon: float,
+    as_of: date | datetime,
+) -> dict[str, Any]:
+    """
+    Compute POI scores for one location using the historical POI snapshot at *as_of*.
+
+    Queries osm_history.poi_history_active (temporal) instead of
+    production.pois_current (current).  Coastal features (dist_coast_km,
+    land_buffer_fraction_1km) still use geo.coastline / geo.land which are
+    static reference datasets.
+
+    Returns a dict with the same keys as compute_scores(), plus 'poi_source'.
+    """
+    pois_1km = query_pois_radius_at_date(session, lat, lon, 1000.0, as_of)
+    pois_400m = query_pois_radius_at_date(session, lat, lon, 400.0, as_of)
+
+    by_category: dict[str, int] = defaultdict(int)
+    by_fclass: dict[str, int] = defaultdict(int)
+    fclasses_1km: set[str] = set()
+    for p in pois_1km:
+        by_category[p.super_category] += 1
+        by_fclass[p.fclass] += 1
+        fclasses_1km.add(p.fclass)
+
+    total_1km = len(pois_1km)
+    entropy = _entropy(dict(by_category), total_1km)
+    entropy_fclass = _entropy(dict(by_fclass), total_1km)
+    n_cat = len(by_category)
+    n_type = len(fclasses_1km)
+    entropy_norm = min(1.0, round(entropy / math.log2(N_SUPER_CATEGORIES), 4))
+    entropy_fclass_norm = min(1.0, round(entropy_fclass / math.log2(N_FCLASS_TYPES), 4))
+
+    accessibility_400m: dict[str, bool] = {}
+    fclass_in_400m = {p.fclass for p in pois_400m}
+    for k in ACCESSIBILITY_KEY_TYPES:
+        accessibility_400m[k] = k in fclass_in_400m
+
+    nearest_km = _nearest_km_by_category_at_date(session, lat, lon, as_of)
+
+    # Coastal correction — same logic as compute_scores(); geo data is static.
+    dist_coast = _dist_coast_km(session, lat, lon)
+
+    if dist_coast is not None and dist_coast < 1.0:
+        land_frac_1km = _land_buffer_fraction_db(session, lat, lon, radius_m=1000.0)
+        if land_frac_1km is None:
+            land_frac_1km = _land_buffer_fraction(dist_coast, radius_km=1.0)
+    elif dist_coast is not None:
+        land_frac_1km = 1.0 if _is_on_land(session, lat, lon) else 0.0
+    else:
+        land_frac_1km = 1.0
+
+    agg = None
+    if by_category:
+        effective_count_1km = total_1km / land_frac_1km if land_frac_1km > 0 else total_1km
+        dens = min(effective_count_1km / 50.0, 1.0)
+        div = min((n_cat / 10.0 + n_type / 20.0) / 2, 1.0)
+        acc = sum(accessibility_400m.values()) / max(len(ACCESSIBILITY_KEY_TYPES), 1)
+        agg = round(100.0 * (0.3 * dens + 0.3 * div + 0.4 * acc), 1)
+
+    return {
+        "poi_count_1km": total_1km,
+        "poi_count_400m": len(pois_400m),
+        "n_categories": n_cat,
+        "n_poi_types": n_type,
+        "entropy": round(entropy, 4),
+        "entropy_fclass": round(entropy_fclass, 4),
+        "entropy_norm": entropy_norm,
+        "entropy_fclass_norm": entropy_fclass_norm,
+        "by_category": dict(by_category),
+        "accessibility_400m": accessibility_400m,
+        "nearest_km": nearest_km,
+        "aggregate_score": agg,
+        "dist_coast_km": dist_coast,
+        "land_buffer_fraction_1km": round(land_frac_1km, 4),
+        "poi_source": "history",
     }

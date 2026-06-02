@@ -83,6 +83,54 @@ Record the **actual** table and column names in [DATA_MODEL.md](DATA_MODEL.md) s
 
 ---
 
+## Load temporal POI history (required once for temporal enrichment)
+
+The feature pipeline can compute POI scores using the **historical POI landscape at the transaction date** of each property. This requires the `osm_history.poi_history_active` table, which is loaded from the CSV files provided by the data team.
+
+### Prerequisites
+
+- PostgreSQL running with PostGIS enabled (local Docker or production DB)
+- Python 3.10+ with `psycopg[binary]`: `python -m pip install "psycopg[binary]"`
+- The CSV files in `data/data/`:
+  - `poi_history_active.csv` — 159,230 POI version rows (2007–2026)
+  - `sales.csv` — 80 transactions with coordinates and dates
+  - `enrichment_results.csv` — pre-computed POI summaries per transaction
+
+### Run the import (once)
+
+```bash
+cd data
+python import_data.py --host localhost --port 5432 --dbname poi_db --user poi_user --password poi_password
+```
+
+This creates and populates three tables:
+- `osm_history.poi_history_active` — temporal POI history with geometry, `valid_range`, and GiST indexes
+- `transactions.sales` — transaction records
+- `transactions.enrichment_results` — pre-computed POI summaries
+
+The script drops and recreates the tables each run, so re-running is safe and serves as a full refresh.
+
+### Verify
+
+```bash
+psql "postgresql://poi_user:poi_password@localhost:5432/poi_db" -c "
+  SELECT COUNT(*) FROM osm_history.poi_history_active;
+  SELECT MIN(valid_from), MAX(valid_to) FROM osm_history.poi_history_active;
+"
+```
+
+Expected: 159,230 rows, date range 2007–2026.
+
+### Using Docker
+
+If Postgres is running inside Docker Compose, run the import from the host pointing to `localhost:5432` (the port is published by `docker-compose.yml`), or exec into the container and run `python import_data.py` from there.
+
+### What happens after loading
+
+The feature pipeline automatically detects which properties have a `transaction_date` and switches to temporal mode for those. Properties without a `transaction_date` continue using `production.pois_current`. You do not need to change any pipeline configuration.
+
+---
+
 ## Load geo reference data (required once per fresh DB)
 
 Two reference tables must be populated before the feature pipeline can compute `dist_coast_km` and `land_buffer_fraction_1km`. Without them both columns are NULL for every property.

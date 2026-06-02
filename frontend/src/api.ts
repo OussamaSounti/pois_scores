@@ -16,12 +16,15 @@ export type ScoreResponse = {
     n_poi_types: number;
     entropy: number;
     entropy_fclass: number;
+    entropy_norm: number;
+    entropy_fclass_norm: number;
     by_category: Record<string, number>;
     accessibility_400m: Record<string, boolean>;
     nearest_km: Record<string, number>;
     aggregate_score: number | null;
     dist_coast_km: number | null;
     land_buffer_fraction_1km: number | null;
+    poi_source: string | null;
   };
 };
 
@@ -47,12 +50,16 @@ export type PropertyScores = {
   n_poi_types: number | null;
   entropy: number | null;
   entropy_fclass: number | null;
+  entropy_norm: number | null;
+  entropy_fclass_norm: number | null;
   aggregate_score: number | null;
   accessibility_400m: Record<string, boolean>;
   by_category: Record<string, number>;
   nearest_km: Record<string, number>;
   dist_coast_km: number | null;
   land_buffer_fraction_1km: number | null;
+  transaction_date: string | null;
+  poi_source: string | null;
 };
 
 export type PropertyMapItem = {
@@ -97,26 +104,38 @@ export type PropertiesFilters = {
 export async function fetchPois(
   lat: number,
   lon: number,
-  radiusKm: number = 1
+  radiusKm: number = 1,
+  asOf?: string
 ): Promise<PoiItem[]> {
-  const res = await fetch(
-    `${API_BASE}/api/v1/pois?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&radius_km=${encodeURIComponent(radiusKm)}`
-  );
+  const params = new URLSearchParams({
+    lat: String(lat),
+    lon: String(lon),
+    radius_km: String(radiusKm),
+  });
+  if (asOf) params.set('as_of', asOf);
+  const res = await fetch(`${API_BASE}/api/v1/pois?${params.toString()}`);
   if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
   const data = await res.json();
   return data.pois ?? [];
 }
 
-export async function fetchScore(lat: number, lon: number): Promise<ScoreResponse> {
-  const res = await fetch(
-    `${API_BASE}/api/v1/scores?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`
-  );
+export async function fetchScore(
+  lat: number,
+  lon: number,
+  asOf?: string
+): Promise<ScoreResponse> {
+  const params = new URLSearchParams({
+    lat: String(lat),
+    lon: String(lon),
+  });
+  if (asOf) params.set('as_of', asOf);
+  const res = await fetch(`${API_BASE}/api/v1/scores?${params.toString()}`);
   if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
   return res.json();
 }
 
 export async function fetchBatch(
-  locations: Array<{ lat: number; lon: number }>
+  locations: Array<{ lat: number; lon: number; as_of?: string }>
 ): Promise<BatchResult> {
   const res = await fetch(`${API_BASE}/api/v1/scores/batch`, {
     method: 'POST',

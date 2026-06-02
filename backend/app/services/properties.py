@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from sqlalchemy import text
@@ -44,16 +45,34 @@ def _build_filter_sql(filters: dict[str, str | None]) -> tuple[str, dict[str, An
     return " AND " + " AND ".join(clauses), params
 
 
+# Must stay in sync with spatial.py constants.
+_N_SUPER_CATEGORIES = 9
+_N_FCLASS_TYPES = 44
+
+
+def _fixed_k_norm(h: float | None, k_total: int) -> float:
+    """H / log2(k_total), clamped to [0, 1]. Penalises low richness and unevenness."""
+    if h is None:
+        return 0.0
+    return min(1.0, round(h / math.log2(k_total), 4))
+
+
 def _score_payload_from_row(row: Any) -> dict[str, Any]:
+    h = float(row.entropy) if row.entropy is not None else None
+    hf = float(row.entropy_fclass) if row.entropy_fclass is not None else None
+    n_cat: int | None = row.n_categories
+    n_type: int | None = row.n_poi_types
     return {
         "poi_refreshed_at": row.poi_refreshed_at.isoformat() if row.poi_refreshed_at else None,
         "pipeline_version": row.pipeline_version,
         "poi_count_1km": row.poi_count_1km,
         "poi_count_400m": row.poi_count_400m,
-        "n_categories": row.n_categories,
-        "n_poi_types": row.n_poi_types,
-        "entropy": float(row.entropy) if row.entropy is not None else None,
-        "entropy_fclass": float(row.entropy_fclass) if row.entropy_fclass is not None else None,
+        "n_categories": n_cat,
+        "n_poi_types": n_type,
+        "entropy": h,
+        "entropy_fclass": hf,
+        "entropy_norm": _fixed_k_norm(h, _N_SUPER_CATEGORIES),
+        "entropy_fclass_norm": _fixed_k_norm(hf, _N_FCLASS_TYPES),
         "aggregate_score": (
             float(row.aggregate_score) if row.aggregate_score is not None else None
         ),
@@ -71,6 +90,10 @@ def _score_payload_from_row(row: Any) -> dict[str, Any]:
             if row.land_buffer_fraction_1km is not None
             else None
         ),
+        "transaction_date": (
+            row.f_transaction_date.isoformat() if row.f_transaction_date else None
+        ),
+        "poi_source": row.poi_source,
     }
 
 
@@ -127,7 +150,9 @@ def list_properties_for_map(
                 by_category,
                 nearest_km,
                 dist_coast_km,
-                land_buffer_fraction_1km
+                land_buffer_fraction_1km,
+                transaction_date,
+                poi_source
             FROM production.property_features
             ORDER BY property_id, poi_refreshed_at DESC
         )
@@ -173,7 +198,9 @@ def list_properties_for_map(
             f.by_category,
             f.nearest_km,
             f.dist_coast_km,
-            f.land_buffer_fraction_1km
+            f.land_buffer_fraction_1km,
+            f.transaction_date AS f_transaction_date,
+            f.poi_source
         FROM production.properties p
         LEFT JOIN latest_features f ON f.property_id = p.id
         WHERE p.longitude BETWEEN :west AND :east
@@ -255,7 +282,9 @@ def get_property_detail(session: Session, property_id: int) -> dict[str, Any] | 
                 by_category,
                 nearest_km,
                 dist_coast_km,
-                land_buffer_fraction_1km
+                land_buffer_fraction_1km,
+                transaction_date,
+                poi_source
             FROM production.property_features
             ORDER BY property_id, poi_refreshed_at DESC
         )
@@ -301,7 +330,9 @@ def get_property_detail(session: Session, property_id: int) -> dict[str, Any] | 
             f.by_category,
             f.nearest_km,
             f.dist_coast_km,
-            f.land_buffer_fraction_1km
+            f.land_buffer_fraction_1km,
+            f.transaction_date AS f_transaction_date,
+            f.poi_source
         FROM production.properties p
         LEFT JOIN latest_features f ON f.property_id = p.id
         WHERE p.id = :property_id

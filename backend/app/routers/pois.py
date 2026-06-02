@@ -1,11 +1,13 @@
 """POI list endpoint for map and right panel."""
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.schemas.pois import PoiItemOut, PoisListResponse
-from app.services.spatial import get_pois_with_distance
+from app.services.spatial import get_pois_with_distance, get_pois_with_distance_at_date
 
 router = APIRouter(prefix="/pois", tags=["pois"])
 
@@ -15,9 +17,19 @@ def list_pois(
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
     radius_km: float = Query(1.0, ge=0.1, le=25.0),
+    as_of: date | None = Query(
+        default=None,
+        description=(
+            "Optional date (YYYY-MM-DD). When provided, POIs active at that date are "
+            "returned from the history table instead of the current snapshot."
+        ),
+    ),
     db: Session = Depends(get_db),
 ) -> PoisListResponse:
     """Get POIs within radius_km of (lat, lon) for map and list display."""
     radius_m = radius_km * 1000.0
-    rows = get_pois_with_distance(db, lat, lon, radius_m)
+    if as_of is not None:
+        rows = get_pois_with_distance_at_date(db, lat, lon, radius_m, as_of)
+    else:
+        rows = get_pois_with_distance(db, lat, lon, radius_m)
     return PoisListResponse(pois=[PoiItemOut(**r) for r in rows])

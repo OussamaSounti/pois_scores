@@ -12,10 +12,11 @@ export default function App() {
   const [pendingSingleLocation, setPendingSingleLocation] = useState<{
     lat: number;
     lon: number;
+    asOf?: string;
   } | null>(null);
 
-  const goToSingleWithLocation = useCallback((lat: number, lon: number) => {
-    setPendingSingleLocation({ lat, lon });
+  const goToSingleWithLocation = useCallback((lat: number, lon: number, asOf?: string) => {
+    setPendingSingleLocation({ lat, lon, asOf });
     setTab('single');
   }, []);
 

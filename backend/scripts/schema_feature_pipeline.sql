@@ -4,6 +4,16 @@ CREATE SCHEMA IF NOT EXISTS production;
 CREATE SCHEMA IF NOT EXISTS geo;
 
 -- ---------------------------------------------------------------------------
+-- osm_history schema
+-- Holds versioned POI history for temporal enrichment queries.
+-- Data is loaded via: python data/import_data.py
+-- The table osm_history.poi_history_active is created and populated by that
+-- script; this block only ensures the schema exists so queries referencing
+-- it do not fail when the import has not yet been run in a given environment.
+-- ---------------------------------------------------------------------------
+CREATE SCHEMA IF NOT EXISTS osm_history;
+
+-- ---------------------------------------------------------------------------
 -- geo.coastline
 -- Holds the reference coastline geometry used to compute dist_coast_km.
 -- Populate with a single INSERT after running this script, e.g.:
@@ -78,7 +88,11 @@ CREATE TABLE IF NOT EXISTS production.property_features (
     nearest_km  jsonb NOT NULL DEFAULT '{}',
     -- Coastal signals (NULL when geo.coastline table is not yet populated)
     dist_coast_km          double precision,
-    land_buffer_fraction_1km double precision
+    land_buffer_fraction_1km double precision,
+    -- Temporal enrichment: date used for POI lookup and which table was queried
+    -- NULL for properties scored against production.pois_current (current mode)
+    transaction_date       date,
+    poi_source             text  -- 'history' | 'current'
 );
 
 CREATE INDEX IF NOT EXISTS idx_property_features_poi_refreshed_at

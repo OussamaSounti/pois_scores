@@ -22,14 +22,15 @@ function filterPoisByItem(pois: PoiItem[], filter: PoiFilterItem): PoiItem[] {
       return inCategory.filter((p) => p.distance_km <= minDist + 1e-9);
     }
     case 'accessibility':
-      return pois.filter((p) => p.fclass === value);
+      if (value === '__all__') return pois.filter((p) => p.distance_km <= 0.4);
+      return pois.filter((p) => p.fclass === value && p.distance_km <= 0.4);
     default:
       return pois;
   }
 }
 
 type Props = {
-  pendingLocation?: { lat: number; lon: number } | null;
+  pendingLocation?: { lat: number; lon: number; asOf?: string } | null;
   onConsumePendingLocation?: () => void;
   onCoordDisplayChange?: (text: string, hasLocation: boolean) => void;
 };
@@ -41,6 +42,7 @@ export default function SingleView({
 }: Props) {
   const [lat, setLat] = useState(String(DEFAULT_LAT));
   const [lon, setLon] = useState(String(DEFAULT_LON));
+  const [asOf, setAsOf] = useState('');
   const [scoreData, setScoreData] = useState<ScoreResponse | null>(null);
   const [pois, setPois] = useState<PoiItem[]>([]);
   const [focusedPoiId, setFocusedPoiId] = useState<number | null>(null);
@@ -53,18 +55,18 @@ export default function SingleView({
   const center: [number, number] | null =
     scoreData != null ? [scoreData.location.lat, scoreData.location.lon] : null;
 
-  const runAnalysis = useCallback(async (latVal: number, lonVal: number) => {
+  const runAnalysis = useCallback(async (latVal: number, lonVal: number, asOfVal?: string) => {
     setError(null);
     setLoading(true);
     setPois([]);
     setPoiFilter(null);
     try {
-      const res = await fetchScore(latVal, lonVal);
+      const res = await fetchScore(latVal, lonVal, asOfVal || undefined);
       setScoreData(res);
       setLat(latVal.toFixed(5));
       setLon(lonVal.toFixed(5));
       try {
-        const poisList = await fetchPois(latVal, lonVal, 1);
+        const poisList = await fetchPois(latVal, lonVal, 1, asOfVal || undefined);
         setPois(poisList);
       } catch {
         setPois([]);
@@ -87,14 +89,14 @@ export default function SingleView({
       setError('Coordinates out of range.');
       return;
     }
-    runAnalysis(latNum, lonNum);
-  }, [lat, lon, runAnalysis]);
+    runAnalysis(latNum, lonNum, asOf || undefined);
+  }, [lat, lon, asOf, runAnalysis]);
 
   const handleMapLocation = useCallback(
     (newLat: number, newLon: number) => {
-      runAnalysis(newLat, newLon);
+      runAnalysis(newLat, newLon, asOf || undefined);
     },
-    [runAnalysis]
+    [asOf, runAnalysis]
   );
 
   useEffect(() => {
@@ -108,9 +110,14 @@ export default function SingleView({
 
   useEffect(() => {
     if (pendingLocation == null) return;
-    const { lat, lon } = pendingLocation;
-    runAnalysis(lat, lon);
+    const { lat, lon, asOf: pendingAsOf } = pendingLocation;
+    // If the incoming location carries its own date, update the date picker to match.
+    if (pendingAsOf !== undefined) {
+      setAsOf(pendingAsOf);
+    }
+    runAnalysis(lat, lon, pendingAsOf !== undefined ? pendingAsOf : asOf || undefined);
     onConsumePendingLocation?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingLocation, onConsumePendingLocation, runAnalysis]);
 
   return (
@@ -142,6 +149,18 @@ export default function SingleView({
               />
             </div>
           </div>
+          <div className="coord-field" style={{ marginTop: 8 }}>
+            <label htmlFor="as-of-input">Score as of date (optional)</label>
+            <input
+              id="as-of-input"
+              type="date"
+              value={asOf}
+              min="2007-03-18"
+              max="2026-03-22"
+              onChange={(e) => setAsOf(e.target.value)}
+              title="Leave empty to use the current POI snapshot. Enter a date to query historical POIs active at that date."
+            />
+          </div>
           {error && <div className="error-banner">{error}</div>}
           <button
             type="button"
@@ -161,6 +180,7 @@ export default function SingleView({
             )
           }
           onClearFilter={() => setPoiFilter(null)}
+          asOfDate={asOf || undefined}
         />
       </div>
 
