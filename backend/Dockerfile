@@ -23,7 +23,6 @@ COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
 
 COPY app ./app
-COPY scripts ./scripts
 RUN chown -R appuser:appuser /app
 
 USER appuser

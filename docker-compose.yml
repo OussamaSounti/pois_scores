@@ -55,7 +55,7 @@ services:
       DATABASE_URL: postgresql://poi_user:poi_password@db:5432/poi_db
       LOG_LEVEL: info
       PIPELINE_VERSION: "1.0"
-    command: ["python", "-m", "app.pipeline.run"]
+    command: ["python", "-m", "app.features.feature_pipeline", "weekly_continuous"]
     depends_on:
       db:
         condition: service_healthy

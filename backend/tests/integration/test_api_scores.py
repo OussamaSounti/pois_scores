@@ -1,6 +1,6 @@
 """Integration tests for score API (single and batch).
 
-Require Postgres with production.pois_current.
+Require Postgres with active.production_pois_current.
 """
 
 from unittest.mock import patch
@@ -66,7 +66,7 @@ class TestSingleScore:
         assert r.status_code == 422
 
     def test_get_scores_computation_error_500(self) -> None:
-        with patch("app.routers.scores.compute_scores") as mock_compute:
+        with patch("app.features.scores.router.compute_scores") as mock_compute:
             mock_compute.side_effect = RuntimeError("db unavailable")
             r = client.get("/api/v1/scores", params={"lat": 33.5, "lon": -7.6})
         assert r.status_code == 500
@@ -74,7 +74,7 @@ class TestSingleScore:
         assert "db unavailable" in r.json()["detail"]
 
     def test_post_scores_computation_error_500(self) -> None:
-        with patch("app.routers.scores.compute_scores") as mock_compute:
+        with patch("app.features.scores.router.compute_scores") as mock_compute:
             mock_compute.side_effect = ValueError("invalid geom")
             r = client.post("/api/v1/scores", json={"lat": 33.5, "lon": -7.6})
         assert r.status_code == 500
@@ -91,8 +91,8 @@ class TestPoisList:
         assert "pois" in data
         assert isinstance(data["pois"], list)
         for p in data["pois"][:3]:
-            assert "id" in p and "name" in p and "fclass" in p
-            assert "super_category" in p and "latitude" in p and "longitude" in p
+            assert "osm_id" in p and "name" in p and "fclass" in p
+            assert "super_category" in p and "lat" in p and "lon" in p
             assert "distance_km" in p
 
     def test_pois_radius_param(self) -> None:
@@ -144,7 +144,7 @@ class TestBatchScores:
         assert r.status_code == 422
 
     def test_batch_computation_error_500(self) -> None:
-        with patch("app.routers.scores.compute_scores") as mock_compute:
+        with patch("app.features.scores.router.compute_scores") as mock_compute:
             mock_compute.side_effect = Exception("connection lost")
             r = client.post(
                 "/api/v1/scores/batch",

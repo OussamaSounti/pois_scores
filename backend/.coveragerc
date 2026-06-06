@@ -1,8 +1,8 @@
 [run]
 source = app
 omit =
-    app/orchestration/*
-    app/pipeline/__main__.py
+    app/features/feature_pipeline/__main__.py
+    app/features/feature_pipeline/flow.py
 
 [report]
 exclude_lines =
