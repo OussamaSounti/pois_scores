@@ -3,6 +3,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.constants import (
+    HIERARCHY_LEVEL_PATTERN,
+    PROPERTIES_MAP_DEFAULT_LIMIT,
+    PROPERTIES_MAP_MAX_LIMIT,
+)
 from app.db import get_db
 from app.schemas.properties import (
     PropertiesMapResponse,
@@ -20,7 +25,7 @@ def list_properties(
     south: float = Query(..., ge=-90, le=90),
     east: float = Query(..., ge=-180, le=180),
     north: float = Query(..., ge=-90, le=90),
-    limit: int = Query(1200, ge=1, le=5000),
+    limit: int = Query(PROPERTIES_MAP_DEFAULT_LIMIT, ge=1, le=PROPERTIES_MAP_MAX_LIMIT),
     district_uid: str | None = Query(default=None),
     neighbourhood_uid: str | None = Query(default=None),
     iris_uid: str | None = Query(default=None),
@@ -48,7 +53,7 @@ def list_properties(
 
 @router.get("/stats", response_model=PropertyStatsResponse)
 def properties_stats(
-    level: str = Query(..., pattern="^(district|neighbourhood|iris|ilot)$"),
+    level: str = Query(..., pattern=HIERARCHY_LEVEL_PATTERN),
     district_uid: str | None = Query(default=None),
     neighbourhood_uid: str | None = Query(default=None),
     iris_uid: str | None = Query(default=None),

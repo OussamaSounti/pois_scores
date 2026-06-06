@@ -8,21 +8,13 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-ACC_KEYS = [
-    "bus_stop",
-    "pharmacy",
-    "school",
-    "hospital",
-    "supermarket",
-    "bank",
-    "atm",
-    "clinic",
-    "fuel",
-    "police",
-    "park",
-    "doctors",
-    "taxi",
-]
+from app.constants import (
+    ACC_KEYS,
+    HIERARCHY_UID_FIELDS,
+    N_FCLASS_TYPES,
+    N_SUPER_CATEGORIES,
+    PROPERTIES_MAP_MAX_LIMIT,
+)
 
 LEVEL_COLUMNS: dict[str, tuple[str, str]] = {
     "district": ("district_uid", "district_name"),
@@ -35,7 +27,7 @@ LEVEL_COLUMNS: dict[str, tuple[str, str]] = {
 def _build_filter_sql(filters: dict[str, str | None]) -> tuple[str, dict[str, Any]]:
     clauses: list[str] = []
     params: dict[str, Any] = {}
-    for key in ["district_uid", "neighbourhood_uid", "iris_uid", "ilot_uid"]:
+    for key in HIERARCHY_UID_FIELDS:
         value = filters.get(key)
         if value:
             clauses.append(f"p.{key} = :{key}")
@@ -43,11 +35,6 @@ def _build_filter_sql(filters: dict[str, str | None]) -> tuple[str, dict[str, An
     if not clauses:
         return "", params
     return " AND " + " AND ".join(clauses), params
-
-
-# Must stay in sync with spatial.py constants.
-_N_SUPER_CATEGORIES = 9
-_N_FCLASS_TYPES = 44
 
 
 def _fixed_k_norm(h: float | None, k_total: int) -> float:
@@ -71,8 +58,8 @@ def _score_payload_from_row(row: Any) -> dict[str, Any]:
         "n_poi_types": n_type,
         "entropy": h,
         "entropy_fclass": hf,
-        "entropy_norm": _fixed_k_norm(h, _N_SUPER_CATEGORIES),
-        "entropy_fclass_norm": _fixed_k_norm(hf, _N_FCLASS_TYPES),
+        "entropy_norm": _fixed_k_norm(h, N_SUPER_CATEGORIES),
+        "entropy_fclass_norm": _fixed_k_norm(hf, N_FCLASS_TYPES),
         "aggregate_score": (
             float(row.aggregate_score) if row.aggregate_score is not None else None
         ),
@@ -216,7 +203,7 @@ def list_properties_for_map(
         "south": south,
         "east": east,
         "north": north,
-        "limit": max(1, min(limit, 5000)),
+        "limit": max(1, min(limit, PROPERTIES_MAP_MAX_LIMIT)),
         **filter_params,
     }
     rows = session.execute(sql, params).fetchall()

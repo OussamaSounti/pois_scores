@@ -3,10 +3,7 @@
 from datetime import date, datetime, timezone
 from typing import Any
 
-from app.services.spatial import ACCESSIBILITY_KEY_TYPES
-
-# Fixed order for acc_* columns (matches schema)
-ACC_KEYS = sorted(ACCESSIBILITY_KEY_TYPES)
+from app.constants import ACC_KEYS
 
 
 def score_dict_to_feature_row(
@@ -26,10 +23,10 @@ def score_dict_to_feature_row(
     ----------
     transaction_date:
         The transaction date used for temporal POI lookup.  NULL for
-        properties scored against production.pois_current (current mode).
+        properties scored against active.production_pois_current (current mode).
     poi_source:
-        'history' when osm_history.poi_history_active was queried;
-        'current' when production.pois_current was queried.
+        'history' when history.production_poi_history was queried;
+        'current' when active.production_pois_current was queried.
     """
     if computed_at is None:
         computed_at = datetime.now(timezone.utc)

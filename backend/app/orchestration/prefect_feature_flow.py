@@ -8,6 +8,7 @@ from prefect import flow, get_run_logger, task
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.constants import CHUNK_SIZE
 from app.db import get_session_factory
 from app.pipeline.run import run_pipeline
 
@@ -21,20 +22,20 @@ def get_latest_external_refresh() -> datetime | None:
     """
     Latest POI refresh timestamp produced by the external pipeline.
 
-    Source: audit.pipeline_runs.run_timestamp.
+    Source: active.audit_pipeline_runs.run_timestamp.
     Returns None if the audit table is unavailable or has no rows.
     """
     session = get_session_factory()()
     try:
         table_exists = _scalar(
             session,
-            "SELECT to_regclass('audit.pipeline_runs') IS NOT NULL",
+            "SELECT to_regclass('active.audit_pipeline_runs') IS NOT NULL",
         )
         if not table_exists:
             return None
         return _scalar(
             session,
-            "SELECT max(run_timestamp) FROM audit.pipeline_runs",
+            "SELECT max(run_timestamp) FROM active.audit_pipeline_runs",
         )
     finally:
         session.close()
@@ -80,24 +81,20 @@ def count_pending_for_refresh(refresh_ts: datetime) -> int:
 
 
 @task
-def run_feature_pipeline(chunk_size: int = 200) -> int:
+def run_feature_pipeline(chunk_size: int = CHUNK_SIZE) -> int:
     """Run the existing feature pipeline implementation."""
     return run_pipeline(chunk_size=chunk_size)
 
 
-def monthly_poi_collecting_audit_flow(chunk_size: int = 200) -> int:
-    return run_pipeline(chunk_size=chunk_size)
-
-
 @flow(name="monthly-poi-feature-recompute")
-def monthly_poi_feature_recompute_flow(chunk_size: int = 200) -> dict[str, str | int]:
+def monthly_poi_feature_recompute_flow(chunk_size: int = CHUNK_SIZE) -> dict[str, str | int]:
     """Run recompute when a new external POI refresh is detected."""
     logger = get_run_logger()
 
     external_ts = get_latest_external_refresh()
     if external_ts is None:
         logger.warning(
-            "No external refresh timestamp found in audit.pipeline_runs. Skipping automation run."
+            "No external refresh timestamp found in active.audit_pipeline_runs. Skipping automation run."
         )
         return {"status": "skipped", "reason": "no_external_refresh"}
 
