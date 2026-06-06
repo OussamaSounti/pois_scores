@@ -140,6 +140,11 @@ def _to_wkt(value: Any) -> str | None:
 
 
 def ensure_target_schema(conn: psycopg2.extensions.connection) -> None:
+    """Create or extend ``production.properties`` so that it has every column the parquet ingest needs.
+
+    Idempotent: uses ``CREATE TABLE IF NOT EXISTS`` and ``ADD COLUMN IF NOT EXISTS``,
+    plus ``CREATE INDEX IF NOT EXISTS`` for transaction lookups.
+    """
     ddl = """
     CREATE SCHEMA IF NOT EXISTS production;
     CREATE EXTENSION IF NOT EXISTS postgis;
@@ -260,6 +265,12 @@ def _record_to_row(record: dict[str, Any]) -> tuple[Any, ...] | None:
 def upsert_rows(
     conn: psycopg2.extensions.connection, rows: list[tuple[Any, ...]], chunk_size: int
 ) -> int:
+    """Bulk-upsert prepared property tuples into ``production.properties``.
+
+    Rows are inserted with ``execute_values`` in batches of ``chunk_size``.
+    Conflicting ``id`` values are updated in place. Returns the total number
+    of rows submitted (insert + update).
+    """
     sql = """
     INSERT INTO production.properties (
         id,
@@ -467,6 +478,12 @@ def upsert_rows(
 
 
 def load_parquet(parquet_path: Path, chunk_size: int) -> tuple[int, int]:
+    """Read ``parquet_path`` and upsert valid rows into ``production.properties``.
+
+    Returns ``(loaded, skipped)``: ``loaded`` is the number of rows
+    successfully upserted, ``skipped`` counts rows missing a transaction id
+    or with invalid coordinates.
+    """
     settings = get_settings()
     conn = psycopg2.connect(settings.database_url)
     try:
@@ -500,6 +517,7 @@ def load_parquet(parquet_path: Path, chunk_size: int) -> tuple[int, int]:
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for the parquet ingest script."""
     parser = argparse.ArgumentParser(
         description="Expand production.properties and ingest a transaction Parquet file."
     )
@@ -514,6 +532,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """CLI entrypoint: load a transaction parquet file into ``production.properties``."""
     args = parse_args()
     parquet_path = Path(args.parquet).expanduser().resolve()
     if not parquet_path.exists():
