@@ -4,17 +4,36 @@ Static business rules that are stable across deployments live here. Values
 that depend on the deployment (URLs, secrets, log levels) belong in
 :class:`app.core.config.Settings` instead.
 
-The accessibility / taxonomy constants are owned by
-``app.features.pois.service`` (where the POI tables live) and are re-exported
-here so non-pois callers do not need to depend on a feature module.
+**NEVER import from ``app.features.*`` in this module.** ``app.core`` is the
+foundation layer; feature modules depend on it, never the reverse.
 """
 
 from __future__ import annotations
 
-from app.features.pois.service import (
-    ACCESSIBILITY_KEY_TYPES,
-    N_FCLASS_TYPES,
-    N_SUPER_CATEGORIES,
+# ---------------------------------------------------------------------------
+# POI taxonomy constants (used by pois, scores, properties, feature_pipeline)
+# ---------------------------------------------------------------------------
+
+N_SUPER_CATEGORIES: int = 11
+
+N_FCLASS_TYPES: int = 91
+
+ACCESSIBILITY_KEY_TYPES: frozenset[str] = frozenset(
+    {
+        "bus_stop",
+        "pharmacy",
+        "school",
+        "hospital",
+        "supermarket",
+        "bank",
+        "atm",
+        "clinic",
+        "fuel",
+        "police",
+        "park",
+        "doctors",
+        "taxi",
+    }
 )
 
 __all__ = [

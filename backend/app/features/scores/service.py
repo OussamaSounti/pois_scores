@@ -24,11 +24,9 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.constants import ACCESSIBILITY_KEY_TYPES, N_FCLASS_TYPES, N_SUPER_CATEGORIES
 from app.core.spatial import _dist_coast_km, _entropy, land_fraction_at_point
 from app.features.pois.service import (
-    ACCESSIBILITY_KEY_TYPES,
-    N_FCLASS_TYPES,
-    N_SUPER_CATEGORIES,
     PoiRow,
     _nearest_km_by_category,
     _nearest_km_by_category_at_date,

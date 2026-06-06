@@ -24,37 +24,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.constants import ACCESSIBILITY_KEY_TYPES, N_FCLASS_TYPES, N_SUPER_CATEGORIES
 from app.core.spatial import _as_of_ts
-
-# ---------------------------------------------------------------------------
-# Shared taxonomy / accessibility constants (used by scoring + tests)
-# ---------------------------------------------------------------------------
-
-# Total number of distinct super_category values present in the dataset
-# (verified by SELECT COUNT(DISTINCT super_category) across both source tables).
-N_SUPER_CATEGORIES = 11
-
-# Total number of distinct fclass values across both source tables.
-N_FCLASS_TYPES = 91
-
-# Key fclass values for accessibility scoring (presence within 400 m).
-ACCESSIBILITY_KEY_TYPES = frozenset(
-    {
-        "bus_stop",
-        "pharmacy",
-        "school",
-        "hospital",
-        "supermarket",
-        "bank",
-        "atm",
-        "clinic",
-        "fuel",
-        "police",
-        "park",
-        "doctors",
-        "taxi",
-    }
-)
 
 
 @dataclass
