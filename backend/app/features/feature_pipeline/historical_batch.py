@@ -25,8 +25,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.constants import POI_SOURCE_HISTORY
 from app.core.db import get_session_factory
-from app.features.feature_pipeline.mapper import score_dict_to_feature_row
-from app.features.feature_pipeline.upsert import upsert_feature_rows
+from app.features.feature_pipeline.db_utils import score_dict_to_feature_row, upsert_feature_rows
 from app.features.scores.service import compute_scores_at_date
 
 logger = logging.getLogger(__name__)

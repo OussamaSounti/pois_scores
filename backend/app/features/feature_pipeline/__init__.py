@@ -11,7 +11,7 @@ Two distinct, operationally-independent flows share a math/upsert core:
   ``poi_source = 'current'``.
 
 Both flows call into :mod:`app.features.scores.service` for the actual math
-and into :mod:`upsert` for the chunked write to ``production.property_features``.
+and into :mod:`db_utils` for the chunked write to ``production.property_features``.
 """
 
 from app.features.feature_pipeline.historical_batch import run_historical_batch

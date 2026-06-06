@@ -1,9 +1,11 @@
 """Feature-based domain modules.
 
-Each subpackage owns one feature end-to-end (router, schemas, service, model,
-SQL). Cross-feature imports are allowed only between scoring (``scores``,
+Each subpackage owns one feature end-to-end (router, schemas, service, SQL).
+Cross-feature imports are allowed only between scoring (``scores``,
 ``pois``, ``feature_pipeline``) since they form a tightly-coupled domain;
-``properties``, ``geo`` and ``health`` are otherwise standalone.
+``properties``, ``geo`` and ``health`` are standalone.
 
-No feature module may be imported from ``app.core``.
+**Dependency rule:** ``app.core`` is the foundation layer. Feature modules may
+import from ``app.core``, but ``app.core`` must **never** import from
+``app.features``. Shared constants live in ``app.core.constants``.
 """

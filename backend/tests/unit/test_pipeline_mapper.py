@@ -2,8 +2,8 @@
 
 from datetime import date, datetime, timezone
 
-from app.features.feature_pipeline.mapper import score_dict_to_feature_row
-from app.features.pois.service import ACCESSIBILITY_KEY_TYPES
+from app.features.feature_pipeline.db_utils import score_dict_to_feature_row
+from app.core.constants import ACCESSIBILITY_KEY_TYPES
 
 
 def test_score_dict_to_feature_row_keys_and_types() -> None:

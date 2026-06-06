@@ -22,8 +22,11 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.constants import CHUNK_SIZE, POI_SOURCE_CURRENT
 from app.core.db import get_session_factory
-from app.features.feature_pipeline.mapper import score_dict_to_feature_row
-from app.features.feature_pipeline.upsert import get_current_poi_ts, upsert_feature_rows
+from app.features.feature_pipeline.db_utils import (
+    get_current_poi_ts,
+    score_dict_to_feature_row,
+    upsert_feature_rows,
+)
 from app.features.scores.service import compute_scores
 
 logger = logging.getLogger(__name__)
