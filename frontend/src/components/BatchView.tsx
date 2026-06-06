@@ -138,7 +138,7 @@ function parseLocations(text: string): Array<{ lat: number; lon: number }> {
 
 type LocationPair = { lat: number; lon: number };
 
-export type RowMeta = { id?: string; label: string };
+type RowMeta = { id?: string; label: string };
 
 function locationsToText(locations: LocationPair[]): string {
   return locations.map(({ lat, lon }) => `${lat} ${lon}`).join('\n');
