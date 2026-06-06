@@ -15,9 +15,14 @@ from app.config import get_settings  # noqa: E402
 
 
 def main() -> int:
+    """Apply ``schema_feature_pipeline.sql`` to the configured database.
+
+    Reads the DSN from :class:`app.config.Settings`. Returns 0 on success,
+    1 if the DSN is missing or the SQL fails to execute.
+    """
     url = get_settings().database_url
     if not url:
-        print("DATABASE_URL not set", file=sys.stderr)
+        print("Database DSN is not configured (settings.database_url is empty)", file=sys.stderr)
         return 1
     script_dir = os.path.dirname(os.path.abspath(__file__))
     sql_path = os.path.join(script_dir, "schema_feature_pipeline.sql")

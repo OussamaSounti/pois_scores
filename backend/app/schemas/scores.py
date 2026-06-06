@@ -4,6 +4,8 @@ from datetime import date
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.constants import BATCH_MAX_LOCATIONS
+
 
 class LocationIn(BaseModel):
     """Single location input (lat, lon, optional as_of date)."""
@@ -121,8 +123,8 @@ class ScoresPayload(BaseModel):
     poi_source: str | None = Field(
         default=None,
         description=(
-            "'history' when scored from osm_history.poi_history_active at a specific date; "
-            "'current' or None when scored from production.pois_current."
+            "'history' when scored from history.production_poi_history at a specific date; "
+            "'current' or None when scored from active.production_pois_current."
         ),
     )
 
@@ -134,9 +136,6 @@ class ScoreResponse(BaseModel):
 
     location: LocationOut
     scores: ScoresPayload
-
-
-BATCH_MAX_LOCATIONS = 500
 
 
 class BatchScoresRequest(BaseModel):

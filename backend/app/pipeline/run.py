@@ -2,26 +2,24 @@
 
 import json
 import logging
-import os
 from datetime import date, datetime, timezone
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
+from app.constants import CHUNK_SIZE, POI_SOURCE_CURRENT, POI_SOURCE_HISTORY, PROPERTY_FEATURE_COLUMNS
 from app.db import get_session_factory
 from app.pipeline.mapper import score_dict_to_feature_row
 from app.services.spatial import compute_scores, compute_scores_at_date
 
 logger = logging.getLogger(__name__)
 
-CHUNK_SIZE = 200
-PIPELINE_VERSION = os.environ.get("PIPELINE_VERSION", "1.0")
-
 
 def _get_current_poi(session: Session) -> datetime:
-    """Current POI version from audit.pipeline_runs (max run_timestamp). If no row, use now()."""
-    row = session.execute(text("SELECT max(run_timestamp) FROM audit.pipeline_runs")).scalar()
+    """Current POI version from active.audit_pipeline_runs (max run_timestamp). If no row, use now()."""
+    row = session.execute(text("SELECT max(run_timestamp) FROM active.audit_pipeline_runs")).scalar()
     if row is not None:
         return row if row.tzinfo else row.replace(tzinfo=timezone.utc)
     return datetime.now(timezone.utc)
@@ -35,7 +33,7 @@ def _get_pending(
     For properties WITH a transaction_date the reference POI timestamp is the
     transaction_date itself (cast to timestamptz midnight UTC).
     For properties WITHOUT a transaction_date the reference is the current POI
-    refresh timestamp from audit.pipeline_runs.
+    refresh timestamp from active.audit_pipeline_runs.
 
     A property is considered done when property_features already has a row
     whose poi_refreshed_at matches the reference timestamp AND the coastal
@@ -89,38 +87,7 @@ def _upsert_rows(session: Session, rows: list[dict[str, Any]]) -> None:
     """Insert or update property_features for the given rows."""
     if not rows:
         return
-    cols = [
-        "property_id",
-        "poi_refreshed_at",
-        "pipeline_version",
-        "computed_at",
-        "poi_count_1km",
-        "poi_count_400m",
-        "n_categories",
-        "n_poi_types",
-        "entropy",
-        "entropy_fclass",
-        "aggregate_score",
-        "acc_bus_stop",
-        "acc_pharmacy",
-        "acc_school",
-        "acc_hospital",
-        "acc_supermarket",
-        "acc_bank",
-        "acc_atm",
-        "acc_clinic",
-        "acc_fuel",
-        "acc_police",
-        "acc_park",
-        "acc_doctors",
-        "acc_taxi",
-        "by_category",
-        "nearest_km",
-        "dist_coast_km",
-        "land_buffer_fraction_1km",
-        "transaction_date",
-        "poi_source",
-    ]
+    cols = list(PROPERTY_FEATURE_COLUMNS)
     placeholders = ", ".join(f":{c}" for c in cols)
     updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != "property_id")
     sql = text(f"""
@@ -141,9 +108,9 @@ def run_pipeline(chunk_size: int = CHUNK_SIZE) -> int:
     Process all pending properties: compute scores and upsert into property_features.
 
     Properties that have a transaction_date are scored against
-    osm_history.poi_history_active at that date (temporal mode).
+    history.production_poi_history at that date (temporal mode).
     Properties without a transaction_date are scored against
-    production.pois_current (current mode).
+    active.production_pois_current (current mode).
 
     Returns total number of properties processed.
     """
@@ -183,17 +150,17 @@ def run_pipeline(chunk_size: int = CHUNK_SIZE) -> int:
                             transaction_date.day,
                             tzinfo=timezone.utc,
                         )
-                        src = "history"
+                        src = POI_SOURCE_HISTORY
                     else:
                         scores = compute_scores(session, lat, lon)
                         poi_ref = current_poi
-                        src = "current"
+                        src = POI_SOURCE_CURRENT
 
                     row = score_dict_to_feature_row(
                         prop_id,
                         scores,
                         poi_ref,
-                        PIPELINE_VERSION,
+                        get_settings().pipeline_version,
                         computed_at,
                         transaction_date=transaction_date,
                         poi_source=src,
@@ -223,7 +190,7 @@ def run_pipeline(chunk_size: int = CHUNK_SIZE) -> int:
 def main() -> None:
     """CLI entrypoint: configure logging and run pipeline."""
     logging.basicConfig(
-        level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        level=get_settings().log_level.upper(),
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
     try:

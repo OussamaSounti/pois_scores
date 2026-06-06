@@ -9,30 +9,77 @@ classifier in _land_buffer_fraction_db() is accurate at the coastline level.
 Usage:
     python scripts/load_osm_land.py
 """
-
-import os
 import sys
+from pathlib import Path
 
 import psycopg2
 import requests
 
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL", "postgresql://poi_user:poi_password@localhost:5432/poi_db"
-)
-# Query only the outer ways of Morocco's national boundary relation (faster)
-QUERY = """
-[out:json][timeout:300];
-relation(3630439);
+# Ensure backend package is importable
+_backend_root = Path(__file__).resolve().parent.parent / "backend"
+if str(_backend_root) not in sys.path:
+    sys.path.insert(0, str(_backend_root))
+
+from app.config import get_settings  # noqa: E402
+
+_settings = get_settings()
+
+# Overpass requires an identifiable User-Agent
+HEADERS = {
+    "Accept": "application/json",
+    "User-Agent": _settings.overpass_user_agent,
+}
+
+# Query only the outer ways of Morocco's national boundary relation (faster).
+QUERY = f"""
+[out:json][timeout:{_settings.overpass_query_timeout_s}];
+relation({_settings.osm_morocco_relation_id});
 way(r:"outer");
 out geom;
 """
 
 
+def create_table_if_not_exists(conn):
+    """Create geo schema and land table if they don't exist."""
+    with conn.cursor() as cur:
+        # Create schema if it doesn't exist
+        cur.execute("CREATE SCHEMA IF NOT EXISTS geo")
+        
+        # Create table if it doesn't exist
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS geo.land (
+                id SERIAL PRIMARY KEY,
+                name TEXT,
+                geom GEOMETRY(MULTIPOLYGON, 4326)
+            )
+        """)
+        # Create spatial index if it doesn't exist
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_land_geom 
+            ON geo.land USING GIST(geom)
+        """)
+    conn.commit()
+
+
 def main() -> int:
-    print("Fetching Morocco boundary (OSM relation 3630439) from Overpass ...")
+    """Download the Morocco boundary from Overpass and replace ``geo.land``.
+
+    Returns 0 on success, non-zero on Overpass / DB failure or when the
+    boundary ring cannot be closed into a valid polygon.
+    """
+    database_url = _settings.database_url
+
+    print(
+        f"Fetching Morocco boundary (OSM relation {_settings.osm_morocco_relation_id}) "
+        f"from Overpass ..."
+    )
     try:
-        resp = requests.post(OVERPASS_URL, data={"data": QUERY}, timeout=330)
+        resp = requests.post(
+            _settings.overpass_url,
+            data=QUERY,
+            timeout=_settings.overpass_http_timeout_s,
+            headers=HEADERS,
+        )
         resp.raise_for_status()
     except requests.RequestException as exc:
         print(f"Overpass error: {exc}", file=sys.stderr)
@@ -46,9 +93,12 @@ def main() -> int:
         print("No outer ways found", file=sys.stderr)
         return 1
 
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(database_url)
     conn.autocommit = False
     try:
+        # Create table if it doesn't exist
+        create_table_if_not_exists(conn)
+        
         with conn.cursor() as cur:
             cur.execute(
                 "CREATE TEMP TABLE _bnd (geom geometry(LineString, 4326)) ON COMMIT DROP"
@@ -80,7 +130,7 @@ def main() -> int:
                 conn.rollback()
                 return 1
 
-            cur.execute("TRUNCATE geo.land")
+            cur.execute("DELETE FROM geo.land")
             cur.execute(
                 "INSERT INTO geo.land (name, geom) "
                 "SELECT %s, ST_Multi(ST_MakeValid("

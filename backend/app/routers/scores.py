@@ -81,7 +81,7 @@ def post_score_batch(
     body: BatchScoresRequest,
     db: Session = Depends(get_db),
 ) -> BatchScoresResponse:
-    """Get POI scores for multiple locations (max 500). Each item may include as_of for per-location historical scoring."""
+    """Get POI scores for multiple locations (cap defined by app.constants.BATCH_MAX_LOCATIONS). Each item may include as_of for per-location historical scoring."""
     results = []
     for loc in body.locations:
         try:
