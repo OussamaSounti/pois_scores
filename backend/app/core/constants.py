@@ -1,0 +1,87 @@
+"""Domain constants — single source of truth for non-environment literals.
+
+Static business rules that are stable across deployments live here. Values
+that depend on the deployment (URLs, secrets, log levels) belong in
+:class:`app.core.config.Settings` instead.
+
+The accessibility / taxonomy constants are owned by
+``app.features.pois.service`` (where the POI tables live) and are re-exported
+here so non-pois callers do not need to depend on a feature module.
+"""
+
+from __future__ import annotations
+
+from app.features.pois.service import (
+    ACCESSIBILITY_KEY_TYPES,
+    N_FCLASS_TYPES,
+    N_SUPER_CATEGORIES,
+)
+
+__all__ = [
+    "ACCESSIBILITY_KEY_TYPES",
+    "ACC_KEYS",
+    "ACC_COLUMN_NAMES",
+    "ACCESSIBILITY_RADIUS_M",
+    "BATCH_MAX_LOCATIONS",
+    "CHUNK_SIZE",
+    "DEFAULT_RADIUS_KM",
+    "HIERARCHY_LEVELS",
+    "HIERARCHY_LEVEL_PATTERN",
+    "HIERARCHY_UID_FIELDS",
+    "KM_TO_M",
+    "MAX_POI_RADIUS_KM",
+    "MAX_POI_RADIUS_M",
+    "MAX_POI_QUERY_RADIUS_M",
+    "N_FCLASS_TYPES",
+    "N_SUPER_CATEGORIES",
+    "POI_SOURCE_CURRENT",
+    "POI_SOURCE_HISTORY",
+    "PROPERTIES_MAP_DEFAULT_LIMIT",
+    "PROPERTIES_MAP_MAX_LIMIT",
+    "PROPERTY_FEATURE_COLUMNS",
+]
+
+ACC_KEYS: tuple[str, ...] = tuple(sorted(ACCESSIBILITY_KEY_TYPES))
+ACC_COLUMN_NAMES: tuple[str, ...] = tuple(f"acc_{k}" for k in ACC_KEYS)
+
+PROPERTY_FEATURE_COLUMNS: tuple[str, ...] = (
+    "property_id",
+    "poi_refreshed_at",
+    "pipeline_version",
+    "computed_at",
+    "poi_count_1km",
+    "poi_count_400m",
+    "n_categories",
+    "n_poi_types",
+    "entropy",
+    "entropy_fclass",
+    "aggregate_score",
+    *ACC_COLUMN_NAMES,
+    "by_category",
+    "nearest_km",
+    "dist_coast_km",
+    "land_buffer_fraction_1km",
+    "transaction_date",
+    "poi_source",
+)
+
+CHUNK_SIZE: int = 200
+
+DEFAULT_RADIUS_KM: float = 1.0
+KM_TO_M: float = 1000.0
+MAX_POI_RADIUS_KM: float = 25.0
+MAX_POI_RADIUS_M: int = 25_000
+MAX_POI_QUERY_RADIUS_M: int = 100_000
+ACCESSIBILITY_RADIUS_M: float = 400.0
+
+BATCH_MAX_LOCATIONS: int = 500
+
+PROPERTIES_MAP_DEFAULT_LIMIT: int = 1200
+PROPERTIES_MAP_MAX_LIMIT: int = 5000
+
+POI_SOURCE_HISTORY: str = "history"
+POI_SOURCE_CURRENT: str = "current"
+
+HIERARCHY_LEVELS: tuple[str, ...] = ("district", "neighbourhood", "iris", "ilot")
+HIERARCHY_LEVEL_PATTERN: str = "^(" + "|".join(HIERARCHY_LEVELS) + ")$"
+HIERARCHY_UID_FIELDS: tuple[str, ...] = tuple(f"{lvl}_uid" for lvl in HIERARCHY_LEVELS)
