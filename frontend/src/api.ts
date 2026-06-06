@@ -41,7 +41,7 @@ export type PoiItem = {
   distance_km: number;
 };
 
-export type PropertyScores = {
+type PropertyScores = {
   poi_refreshed_at: string | null;
   pipeline_version: string | null;
   poi_count_1km: number | null;

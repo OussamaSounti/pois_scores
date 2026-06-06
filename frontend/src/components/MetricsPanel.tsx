@@ -2,7 +2,7 @@ import type { ScoreResponse } from '../api';
 import { ACC_META, CAT_ICONS, SCORE_TOOLTIPS } from '../constants';
 import Tooltip from './Tooltip';
 
-export type PoiFilterSection = 'category_density' | 'accessibility' | 'nearest' | null;
+type PoiFilterSection = 'category_density' | 'accessibility' | 'nearest' | null;
 
 export type PoiFilterItem = { section: PoiFilterSection; value: string } | null;
 
