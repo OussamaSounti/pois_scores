@@ -1,81 +1,217 @@
 # Architecture — Morocco Spatial Dashboard
 
-High-level design and data flow for the dashboard, API, and database.
+**What:** How the dashboard, API, pipeline, and database fit together.  
+**Why:** Understand data ownership, scoring modes, and where logic lives before changing code.
+
+---
 
 ## System context
 
+```mermaid
+flowchart TB
+  subgraph clients [Clients]
+    Browser[React dashboard :3000]
+    External[Scripts / ML / other apps]
+  end
+
+  subgraph backend [Backend FastAPI :8000]
+    Routers[routers scores pois properties geo]
+    Services[services]
+    Repos[repositories SQL]
+  end
+
+  subgraph pipeline [Offline pipeline]
+    Weekly[weekly_continuous]
+    Hist[historical_batch]
+    Prefect[Prefect flows]
+  end
+
+  subgraph db [PostgreSQL + PostGIS]
+    Active[active.production_pois_current]
+    History[history.production_poi_history]
+    Prod[production.properties / property_features]
+    GeoT[geo.land / geo.coastline]
+  end
+
+  subgraph external_poi [External POI pipeline]
+    POIRefresh[Monthly POI refresh]
+  end
+
+  Browser --> Routers
+  External --> Routers
+  Routers --> Services
+  Services --> Repos
+  Repos --> Active
+  Repos --> History
+  Repos --> Prod
+  Repos --> GeoT
+
+  Weekly --> Services
+  Hist --> Services
+  Prefect --> Weekly
+  Prefect --> Hist
+  Weekly --> Prod
+  Hist --> Prod
+
+  POIRefresh --> Active
+  POIRefresh --> History
 ```
-┌─────────────────┐         ┌──────────────────────────────────┐
-│  User / Browser │ ◄─────► │  Dashboard (React, Vite)          │
-│  (localhost:3000)         │  Single + Batch tabs, Leaflet map │
-└─────────────────┘         └─────────────────┬────────────────┘
-                                               │ HTTP (REST)
-                                               ▼
-┌─────────────────┐         ┌──────────────────────────────────┐
-│  External tools │ ◄─────► │  Backend API (FastAPI)            │
-│  (scripts, etc.)          │  localhost:8000, /api/v1/*        │
-└─────────────────┘         └─────────────────┬────────────────┘
-                                               │ SQL (read-only)
-                                               ▼
-                               ┌──────────────────────────────────┐
-                               │  PostgreSQL + PostGIS            │
-                               │  production.pois, spatial index  │
-                               └──────────────────────────────────┘
+
+**Key points:**
+
+- Dashboard and external clients use the **same REST API**.
+- Backend is the **only** component that talks to the database from the app side.
+- POI data in `active.*` / `history.*` is **owned by an external pipeline** — this repo reads it.
+- `production.*` and `geo.*` tables are **owned by this app** (schema in `scripts/schema/`).
+
+---
+
+## Backend layers
+
+```
+main.py          → wires routers + /health, /ready, /metrics
+features.*       → business logic (scores, pois, properties, geo, pipeline)
+repositories.*   → all SQL queries
+core.*           → config, DB session, tables.py, spatial math, metrics
 ```
 
-- **Dashboard** and any external client call the **same API** (single-location and batch scores, POI list).
-- **Backend** is the only component that talks to the database. No direct DB access from the frontend.
-- **Database** in production is an existing DB (refreshed by another pipeline); the app does not run migrations or restore dumps. For local/dev, use a dump or init script.
+See [backend/app/README.md](../backend/app/README.md) and [backend/app/repositories/README.md](../backend/app/repositories/README.md).
 
-## Data flow
+**Dependency rule:** `core` never imports from `features`. Table names come from `core/tables.py`.
 
-### Single-location score
+---
 
-1. User enters coordinates or double-clicks the map (or arrives from a batch row click).
-2. Frontend calls `GET /api/v1/scores?lat=…&lon=…` (or `POST /api/v1/scores`).
-3. Backend: load POIs within 1 km and 400 m (PostGIS `ST_DWithin`), compute density, diversity (entropy), accessibility flags, nearest-by-category; optionally aggregate score.
-4. Response: `{ location: { lat, lon }, scores: { poi_count_1km, by_category, accessibility_400m, nearest_km, … } }`.
-5. Frontend optionally calls `GET /api/v1/pois?lat=…&lon=…&radius_km=1` to list POIs for the map and right panel.
+## Two scoring modes
 
-### Batch scores
+| Mode | Trigger | POI source | Output |
+|------|---------|------------|--------|
+| **Live API** | HTTP request to `/api/v1/scores` | `active.production_pois_current` (or history via `as_of`) | JSON in response |
+| **Batch pipeline** | CLI, Docker, or Prefect | Current snapshot or `history.production_poi_history` at `transaction_date` | Rows in `production.property_features` |
 
-1. User pastes coordinates or uploads CSV/JSON; frontend parses and validates (max 500 locations).
-2. Frontend calls `POST /api/v1/scores/batch` with `{ locations: [ { lat, lon }, … ] }`.
-3. Backend: for each location, same score logic as single-location; returns `{ results: [ { location, scores }, … ] }` in the same order.
-4. Frontend displays the table; user can export CSV (with optional `input_row` from file) or click a row to open that site in the Single tab.
+Both use the same functions in `features/scores/service.py`. Details: [scores README](../backend/app/features/scores/README.md).
 
-### POI list (map and right panel)
+The **Properties** tab reads **precomputed** features from `production.property_features` — it does not run live scoring per click.
 
-1. After a single-location analysis, frontend calls `GET /api/v1/pois?lat=…&lon=…&radius_km=1`.
-2. Backend: query `production.pois` within radius with `ST_DWithin`, order by distance, return `{ pois: [ { id, name, fclass, super_category, latitude, longitude, distance_km }, … ] }`.
-3. Frontend draws markers on the map and the list in the right panel; optional filter by metric section (category, accessibility, or nearest).
+---
 
-## Components
+## Data flows
 
-| Component   | Role |
-|------------|------|
-| **Frontend** | React SPA; Single tab (map, metrics, POI list, section filters), Batch tab (input, file drop, results table, export CSV, row → Single). |
-| **Backend**  | FastAPI; see full endpoint list below; config via env (`DATABASE_URL`, `CORS_ORIGINS`). |
-| **Database** | PostgreSQL 15+ with PostGIS; table `production.pois_current` (and audit/staging/geo). Production = existing DB; local/dev = dump or init script. |
+### Single-location score (live)
+
+1. User enters coordinates or double-clicks the map.
+2. Frontend → `GET /api/v1/scores?lat=…&lon=…` (or POST with JSON body).
+3. `scores/service.py`: query POIs within 1 km and 400 m, compute density, diversity, accessibility, nearest, coastal signals.
+4. Response: `{ location, scores }`.
+5. Frontend → `GET /api/v1/pois?lat=…&lon=…&radius_km=1` for map markers and POI list.
+
+Optional `as_of` date uses `history.production_poi_history` with SCD2 filter (`is_canonical = true`).
+
+### Batch scores (live)
+
+1. User uploads CSV/JSON or pastes coordinates (max 500).
+2. Frontend → `POST /api/v1/scores/batch`.
+3. Backend runs the same score logic per location; returns ordered results.
+4. User exports CSV or clicks a row → Single tab.
+
+### Properties map (precomputed)
+
+1. Frontend → `GET /api/v1/properties` with bounding box and optional admin filters.
+2. Backend joins `production.properties` + `production.property_features`.
+3. Stats and detail endpoints support admin hierarchy drill-down.
+
+See [properties README](../backend/app/features/properties/README.md).
+
+### Feature pipeline (offline)
+
+1. **Weekly continuous:** detect new POI version via `max(active.audit_pipeline_runs.run_timestamp)`; score pending properties against current POIs.
+2. **Historical batch:** for properties with `transaction_date`, score at that date using SCD2 history.
+3. Write flattened columns to `production.property_features`; record run in `production.feature_pipeline_runs`.
+
+See [feature_pipeline README](../backend/app/features/feature_pipeline/README.md).
+
+### Local bootstrap (not production)
+
+```mermaid
+flowchart LR
+  Schema[scripts/schema] --> DB[(Postgres)]
+  Geo[scripts/ingest geo] --> DB
+  Parquet[scripts/ingest parquet] --> DB
+  Dump[data/poi_db_export.sql] --> DB
+  Pipeline[feature_pipeline] --> DB
+```
+
+Production skips dump restore — POI data arrives from the external pipeline.
+
+---
+
+## Frontend
+
+React SPA with three tabs ([frontend/README.md](../frontend/README.md)):
+
+| Tab | Purpose |
+|-----|---------|
+| Single | Live score + map + POI panel |
+| Batch | Live batch scores + export |
+| Properties | Precomputed property features on map |
+
+Dev proxy in Vite forwards `/api` to `localhost:8000`.
+
+---
 
 ## API endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/health` | Liveness :  `{"status": "ok"}` |
-| GET | `/ready` | Readiness to checks DB connectivity. 503 if unreachable |
-| GET | `/metrics` | Prometheus metrics (not in OpenAPI schema) |
-| GET | `/api/v1/scores` | (query params `lat`, `lon`) Single-location POI score  |
-| POST | `/api/v1/scores` | POI score for asingle location (JSON body) |
-| POST | `/api/v1/scores/batch` | Batch POI scores (max 500 locations) |
-| GET | `/api/v1/pois` | POIs within radius for map/list display |
-| GET | `/api/v1/properties` | Property markers in bbox with latest feature payload. supports admin hierarchy filters (`district_uid`, `neighbourhood_uid`, `iris_uid`, `ilot_uid`) |
-| GET | `/api/v1/properties/stats` | Grouped avg scores by admin level (`district`/`neighbourhood`/`iris`/`ilot`) |
-| GET | `/api/v1/properties/{id}` | Single property with full feature payload |
-| GET | `/api/v1/geo/land` | `geo.land` (map overlay / verification)  Morocco polygon as GeoJSON |
-| GET | `/api/v1/geo/coastline` | `geo.coastline` (map overlay / verification) OSM coastline segments as GeoJSON  |
+| GET | `/health` | Liveness |
+| GET | `/ready` | DB connectivity (503 if down) |
+| GET | `/metrics` | Prometheus metrics |
+| GET/POST | `/api/v1/scores` | Single-location score |
+| POST | `/api/v1/scores/batch` | Batch scores (max 500) |
+| GET | `/api/v1/pois` | POIs within radius |
+| GET | `/api/v1/properties` | Property markers in bbox |
+| GET | `/api/v1/properties/stats` | Grouped stats by admin level |
+| GET | `/api/v1/properties/{id}` | Property detail + features |
+| GET | `/api/v1/geo/land` | Land polygon GeoJSON |
+| GET | `/api/v1/geo/coastline` | Coastline GeoJSON |
 
-## Configuration and “real” database
+OpenAPI: http://localhost:8000/docs
 
-- **Development:** Local Postgres in Docker (and optional backend in Docker); optionally restore a dump or use minimal schema for tests.
-- **Production:** Connect to the existing database via `DATABASE_URL`; no restore. The DB is set up and refreshed monthly by another pipeline. See [RUNBOOK.md](RUNBOOK.md) and [DATA_MODEL.md](DATA_MODEL.md).
+---
+
+## Database schemas
+
+| Schema | Owner | Key tables |
+|--------|-------|------------|
+| `active` | External POI pipeline | `production_pois_current`, `audit_pipeline_runs` |
+| `history` | External POI pipeline | `production_poi_history` (SCD2) |
+| `production` | This app | `properties`, `property_features`, `feature_pipeline_runs` |
+| `geo` | This app (local bootstrap) | `land`, `coastline` |
+
+Full reference: [DATA_MODEL.md](DATA_MODEL.md).
+
+---
+
+## Configuration
+
+| Variable | Used by |
+|----------|---------|
+| `DATABASE_URL` | API, pipeline, scripts |
+| `CORS_ORIGINS` | API |
+| `LOG_LEVEL` | API, pipeline |
+| `PIPELINE_VERSION` | Pipeline → `property_features` |
+| `VITE_API_URL` | Frontend (optional override) |
+
+**Production:** set `DATABASE_URL` to the managed Postgres instance. No code changes.
+
+**Local/dev:** Docker Compose Postgres + optional dump. See [GETTING_STARTED.md](GETTING_STARTED.md).
+
+---
+
+## Further reading
+
+| Doc | Topic |
+|-----|-------|
+| [DATA_MODEL.md](DATA_MODEL.md) | Tables and columns |
+| [RUNBOOK.md](RUNBOOK.md) | Operations |
+| [PRODUCTION_POIS_PLATFORM.md](PRODUCTION_POIS_PLATFORM.md) | Production context |
+| [PROJECT_SPEC.md](../PROJECT_SPEC.md) | Product requirements |

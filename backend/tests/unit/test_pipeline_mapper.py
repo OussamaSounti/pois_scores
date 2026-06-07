@@ -29,14 +29,14 @@ def test_score_dict_to_feature_row_keys_and_types() -> None:
     computed_at = datetime(2025, 3, 1, 12, 5, 0, tzinfo=timezone.utc)
 
     row = score_dict_to_feature_row(
-        property_id=1,
+        transaction_id=1,
         scores=scores,
         current_poi=current_poi,
         pipeline_version="1.0",
         computed_at=computed_at,
     )
 
-    assert row["property_id"] == 1
+    assert row["transaction_id"] == 1
     assert row["poi_refreshed_at"] == current_poi
     assert row["pipeline_version"] == "1.0"
     assert row["computed_at"] == computed_at
@@ -77,14 +77,14 @@ def test_score_dict_to_feature_row_default_computed_at() -> None:
     current_poi = datetime.now(timezone.utc)
 
     row = score_dict_to_feature_row(
-        property_id=42,
+        transaction_id=42,
         scores=scores,
         current_poi=current_poi,
         pipeline_version="test",
         computed_at=None,
     )
 
-    assert row["property_id"] == 42
+    assert row["transaction_id"] == 42
     assert row["computed_at"] is not None
     assert row["aggregate_score"] is None
     assert row["by_category"] == {}
@@ -114,7 +114,7 @@ def test_score_dict_to_feature_row_temporal_mode() -> None:
     tx_date = date(2018, 3, 23)
     poi_ref = datetime(2018, 3, 23, tzinfo=timezone.utc)
     row = score_dict_to_feature_row(
-        property_id=99,
+        transaction_id=99,
         scores=scores,
         current_poi=poi_ref,
         pipeline_version="1.0",

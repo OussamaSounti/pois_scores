@@ -6,11 +6,11 @@ Conventions and quality gates for the Morocco Spatial Dashboard. All contributor
 
 | Component      | Version / requirement | Where pinned |
 |----------------|----------------------|--------------|
-| Python         | 3.12+                | Backend Dockerfile, CI image, requirements.txt |
+| Python         | 3.12+                | Backend Dockerfile, CI image, `backend/requirements*.txt` |
 | Node           | 18+ LTS (e.g. 20)    | CI; recommend `engines` in frontend/package.json |
 | TypeScript     | 5.x                  | frontend/package.json |
-| PostgreSQL     | 15+ with PostGIS     | docker-compose.yml, CI service |
-| Backend API    | FastAPI              | backend/requirements.txt |
+| PostgreSQL     | 16+ with PostGIS     | docker-compose.yml (`postgis/postgis:16-3.5-alpine`), CI service |
+| Backend API    | FastAPI              | `backend/requirements.txt` (see `backend/REQUIREMENTS.md`) |
 | Frontend       | Vite, React 18       | frontend/package.json |
 
 ## Architecture boundaries
@@ -34,8 +34,8 @@ Conventions and quality gates for the Morocco Spatial Dashboard. All contributor
 | TS utils / api     | camelCase    | `fetchScore`, `api.ts` |
 | API JSON fields   | snake_case   | `poi_count_1km`, `aggregate_score` |
 | API routes        | /api/v1/…   | Plural resources: `/api/v1/scores`, `/api/v1/pois` |
-| DB tables/columns | snake_case   | `production.pois_current`, `content_hash` |
-| DB indexes         | idx_&lt;schema&gt;_&lt;name&gt; | `idx_prod_geom`, `idx_prod_is_active` |
+| DB tables/columns | snake_case   | `active.production_pois_current`, `poi_count_1km` |
+| DB indexes         | idx_&lt;table&gt;_&lt;column&gt; | `idx_production_pois_current_geom` |
 | Branches           | type/desc    | `feature/poi-filter`, `fix/health-check`, `docs/runbook` |
 | Commits            | Conventional | `feat: add batch export`, `fix: score 500 on invalid geom`, `docs: update DATA_MODEL` |
 
@@ -80,3 +80,18 @@ Conventions and quality gates for the Morocco Spatial Dashboard. All contributor
 ## Batch API: optional client `id`
 
 The batch score request accepts an optional `id` per location (`LocationBatchItem.id`). This is for **client-side correlation only** (e.g. matching results to input rows). The API returns results in the **same order** as the request; it does not echo `id` in the response. Clients should match by index or store the mapping locally.
+
+## Documentation
+
+All docs live in-repo as Markdown. Start at [docs/README.md](README.md).
+
+| Change type | Update these files |
+|-------------|-------------------|
+| Schema / table rename | `backend/app/core/tables.py` → [DATA_MODEL.md](DATA_MODEL.md) → [RUNBOOK.md](RUNBOOK.md) → [scripts/README.md](../scripts/README.md) |
+| New CLI script | [scripts/README.md](../scripts/README.md) → [RUNBOOK.md](RUNBOOK.md) if operational |
+| New API endpoint | Feature README + [ARCHITECTURE.md](ARCHITECTURE.md) endpoint table |
+| New feature module | README in module folder + [backend/app/features/README.md](../backend/app/features/README.md) |
+
+Write docs in plain English: start with **what** and **why**, then **how**. Link to module READMEs instead of duplicating algorithm details.
+
+Avoid stale names: `production.pois_current`, `osm_history.*`, `backend/scripts/`, `audit.pipeline_runs` (use `active.audit_pipeline_runs`).

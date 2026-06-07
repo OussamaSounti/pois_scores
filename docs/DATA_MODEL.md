@@ -1,152 +1,200 @@
 # Data model
 
-Schema and data: **in production** from the existing database (refreshed by an external pipeline); **for local/dev** from a dump or from the minimal init script (`init_schema_ci.sql`). The backend **reads** these tables only; it does not create or alter the POI schema. Use this document to query the correct schema, table, and column names.
+**What:** PostgreSQL schemas and tables used by the API and feature pipeline.  
+**Why:** The backend reads these tables only — it does not create or alter the external POI schema. Use this document to look up correct schema, table, and column names.
+
+**Source of truth in code:** [`backend/app/core/tables.py`](../backend/app/core/tables.py)  
+**POI export details:** [`data/README.md`](../data/README.md) (taxonomy, dump format)  
+**Schema SQL:** [`scripts/schema/`](../scripts/schema/)
 
 ---
 
-## Main table for POI scores: `production.pois_current`
+## Schema overview
 
-All score endpoints (single location and batch) should query **`production.pois_current`**. This is the canonical POI table for the API. The API uses only **active** rows (`is_active = true`).
+| Schema | Owner | Purpose |
+|--------|-------|---------|
+| `active` | External POI pipeline | Current POI snapshot, audit, taxonomy |
+| `history` | External POI pipeline | SCD2 versioned POI timeline |
+| `production` | This app | Properties, precomputed features, pipeline run ledger |
+| `geo` | This app (local bootstrap) | Coastline and land reference polygons |
 
-| Column             | Type             | Nullable | Default   | Description        |
-|--------------------|------------------|----------|-----------|--------------------|
-| id                 | bigint           | NOT NULL | sequence  | Primary key        |
-| osm_id             | text             | NOT NULL | —         | OpenStreetMap ID   |
-| name               | text             | NOT NULL | `'Unnamed'` | POI name        |
-| fclass             | text             | NOT NULL | —         | Fine class (e.g. bus_stop, pharmacy) |
-| super_category     | text             | NOT NULL | —         | Category (e.g. Transport, Healthcare) |
-| latitude           | double precision | NOT NULL | —         | Latitude           |
-| longitude          | double precision | NOT NULL | —         | Longitude          |
-| geom               | geometry         | —        | —         | PostGIS geometry (used in spatial indexes) |
-| content_hash       | text             | NOT NULL | —         | Hash for change detection |
-| first_seen_at      | timestamptz      | NOT NULL | now()     | First import time  |
-| last_seen_at       | timestamptz      | NOT NULL | now()     | Last seen time     |
-| updated_at         | timestamptz      | NOT NULL | now()     | Last update        |
-| is_active          | boolean          | NOT NULL | true      | Only active rows are used by the API |
-| source_snapshot_date | date           | YES      | —         | Snapshot date of source data |
+```mermaid
+flowchart LR
+  subgraph external [External POI pipeline]
+    POI[active.production_pois_current]
+    HIST[history.production_poi_history]
+    AUDIT[active.audit_pipeline_runs]
+  end
 
-**Indexes**
+  subgraph app [This app]
+    PROPS[production.properties]
+    FEAT[production.property_features]
+    RUNS[production.feature_pipeline_runs]
+    GEO[geo.coastline / geo.land]
+  end
 
-| Index                   | Type  | Definition                          |
-|-------------------------|-------|-------------------------------------|
-| idx_prod_content_hash   | btree | (content_hash)                       |
-| idx_prod_fclass         | btree | (fclass)                            |
-| idx_prod_geom           | gist  | (geom)                              |
-| idx_prod_geom_geog       | gist  | (geom::geography)                   |
-| idx_prod_is_active      | btree | (is_active)                         |
-| idx_prod_name           | btree | (name)                              |
-| idx_prod_super_category | btree | (super_category)                    |
-
-Use `latitude` / `longitude` for simple distance or bbox logic; use `geom` (and the gist indexes) for PostGIS spatial queries (e.g. ST_DWithin, ST_Distance).
-
----
-
-## Other schemas from the dump (reference)
-
-The dump also includes **audit**, **geo**, and **staging** schemas. The API is built on **`production.pois_current`**; the tables below are for context and pipeline/ETL use.
-
-### `audit`
-
-- **audit.pipeline_runs**: run_id, run_timestamp, source_file, source_snapshot_date, pipeline_version, status, duration_seconds, notes — queried by the pipeline to get the current POI version (`max(run_timestamp)`). Maintained by the external POI refresh pipeline; this app does not write to it.
-
-### `geo`
-
-- **geo.coastline**: id, name, geom (MultiLineString, 4326) — OSM coastline segments for Morocco. Required for computing `dist_coast_km` and `land_buffer_fraction_1km`. Load with `python scripts/load_osm_coastline.py`.
-- **geo.land**: id, name, geom (MultiPolygon, 4326) — Morocco land polygon. Required for checking whether a point is on land. Load with `python scripts/load_osm_land.py`.
-
-### `osm_history`
-
-- **osm_history.poi_history_active**: versioned POI snapshots used by the `as_of` parameter on score endpoints. Populated by running `python data/import_data.py`. The schema is created by `schema_feature_pipeline.sql`; the table is created and populated by the import script. When not loaded, `as_of` requests fall back to `production.pois_current`.
+  POI --> API[FastAPI scores/pois]
+  HIST --> API
+  POI --> Pipeline[feature_pipeline]
+  HIST --> Pipeline
+  AUDIT --> Pipeline
+  PROPS --> Pipeline
+  GEO --> Pipeline
+  Pipeline --> FEAT
+  Pipeline --> RUNS
+  FEAT --> API
+```
 
 ---
 
-## Spatial indexing
+## POI tables (external — read only)
 
-- **`production.pois_current`** (main table for the API): has both **latitude** and **longitude** (double precision) and a PostGIS **geom** column. Indexes include:
-  - **btree** on `is_active` (filter active POIs).
-  - **btree** on `fclass`, `name`, `super_category`, `content_hash`.
-  - **gist** on `geom` and on `geom::geography` for PostGIS spatial queries (e.g. `ST_DWithin`, `ST_Distance`).
+### `active.production_pois_current`
 
-For the score API, use **`production.pois_current`** with `is_active = true` and either:
-- btree + app-side Haversine, or  
-- PostGIS on `geom` / `geom::geography` for “within radius” and distance.
+**What the API and pipeline query for live POI data.** Flat snapshot: one row per POI.
 
----
+| Column | Type | Description |
+|--------|------|-------------|
+| `osm_id` | text | Primary key — OpenStreetMap element ID |
+| `name` | text | POI name (default `'Unnamed'`) |
+| `fclass` | text | Fine class (e.g. `bus_stop`, `pharmacy`) |
+| `super_category` | text | Category (e.g. Transport, Healthcare) |
+| `lat` | double precision | WGS84 latitude |
+| `lon` | double precision | WGS84 longitude |
+| `geom` | geometry(Point, 4326) | PostGIS point for spatial queries |
 
-## Feature pipeline tables (ML input)
+**Indexes:** GiST on `geom`; btree on `super_category`.
 
-These tables are **not** in the dump; they are created by the script [schema_feature_pipeline.sql](../backend/scripts/schema_feature_pipeline.sql) (see [RUNBOOK](RUNBOOK.md#feature-engineering-pipeline)). The pipeline reads from `production.properties` and **`production.pois_current`** (active POIs), and writes to `production.property_features`.
+There is **no** `is_active` column — all rows in this table are the current snapshot.
 
-### `production.properties` (input)
+Use `lat` / `lon` for simple distance logic; use `geom` with PostGIS (`ST_DWithin`, `ST_Distance`) for radius queries.
 
-Portfolio of real-estate records for checking and verifications; each row is one property location to score. Populated by running `python backend/scripts/load_properties_from_parquet.py` (see [RUNBOOK](RUNBOOK.md#load-properties-from-parquet)). The pipeline only reads from this table.
+### `history.production_poi_history`
 
-> **Local/dev note:** `schema_feature_pipeline.sql` creates a minimal version of this table with only `id`, `latitude`, `longitude`, and `metadata`. The full column set below reflects the production table and what `load_properties_from_parquet.py` populates.
+**What the pipeline uses for temporal scoring** at a property's `transaction_date`. SCD2 versioned timeline.
 
-| Column               | Type             | Nullable | Description |
-|----------------------|------------------|----------|-------------|
-| id                   | bigint           | NOT NULL | Primary key |
-| latitude             | double precision | NOT NULL | WGS84 latitude |
-| longitude            | double precision | NOT NULL | WGS84 longitude |
-| metadata             | jsonb            | YES      | Arbitrary key-value metadata |
-| transaction_id       | text             | YES      | Source transaction identifier |
-| transaction_date     | date             | YES      | Date of the transaction |
-| transaction_year     | integer          | YES      | Year extracted from transaction_date |
-| transaction_month    | integer          | YES      | Month extracted from transaction_date |
-| transaction_quarter  | integer          | YES      | Quarter extracted from transaction_date |
-| asset_price          | numeric          | YES      | Transaction price (MAD) |
-| asset_surface        | numeric          | YES      | Floor area (m²) |
-| asset_psqm           | numeric          | YES      | Price per m² (MAD/m²) |
-| asset_rooms          | integer          | YES      | Number of rooms |
-| asset_floor          | integer          | YES      | Floor number |
-| asset_type           | text             | YES      | Asset type (e.g. apartment, villa) |
-| district_uid         | text             | YES      | Admin district UID (join key) |
-| district_name        | text             | YES      | Admin district name |
-| neighbourhood_uid    | text             | YES      | Neighbourhood UID |
-| neighbour_name       | text             | YES      | Neighbourhood name |
-| iris_uid             | text             | YES      | IRIS zone UID |
-| iris_code            | text             | YES      | IRIS zone code |
-| ilot_uid             | text             | YES      | Îlot UID |
-| ilot_objectid        | text             | YES      | Îlot object ID |
+| Column | Type | Description |
+|--------|------|-------------|
+| `osm_id` | text | OpenStreetMap element ID |
+| `name` | text | POI name |
+| `fclass` | text | Fine class |
+| `super_category` | text | Category |
+| `lat` | double precision | WGS84 latitude |
+| `lon` | double precision | WGS84 longitude |
+| `geom` | geometry(Point, 4326) | PostGIS point |
+| `valid_from` | timestamptz | Version start (inclusive) |
+| `valid_to` | timestamptz | Version end (exclusive) |
+| `is_canonical` | boolean | `true` = deduplicated row for queries |
 
-The four `*_uid` columns (`district_uid`, `neighbourhood_uid`, `iris_uid`, `ilot_uid`) power the hierarchy drill-down in `/api/v1/properties/stats` and `/api/v1/properties ` map filter .
+**Query filter (required):** always include `is_canonical = true` and `valid_from <= as_of < valid_to`. See `POI_HISTORY_SCD2_WHERE` in `tables.py`.
 
-**POI version (for the feature pipeline):** The pipeline uses **`audit.pipeline_runs.run_timestamp`** (e.g. `max(run_timestamp)`) as the current POI version. That table is maintained by the external POI refresh pipeline; this app does not write to it.
+**Source:** populated by the external POI pipeline or restored from [`data/poi_db_export.sql`](../data/poi_db_export.sql). There is no CSV import in this repo.
 
-### `production.property_features` (output, ML input)
+### `active.audit_pipeline_runs`
 
-One row per property; each column is a spatial indicator. The ML team reads this table (e.g. with `pandas.read_sql`) as the direct input to the property valuation model; no API calls needed.
+**What the weekly pipeline reads** to detect a new POI refresh.
 
-| Column            | Type      | Description |
-|-------------------|-----------|-------------|
-| property_id       | bigint    | PK, FK → properties(id) |
-| poi_refreshed_at  | timestamptz | POI version used to compute this row; **use for reproducibility** (e.g. train and evaluate on same version). |
-| pipeline_version  | text      | Version of the pipeline that wrote the row. |
-| computed_at       | timestamptz | When the row was computed. |
-| poi_count_1km     | integer   | Number of POIs within 1 km. |
-| poi_count_400m    | integer   | Number of POIs within 400 m. |
-| n_categories      | integer   | Number of distinct super_categories within 1 km. |
-| n_poi_types       | integer   | Number of distinct fclass values within 1 km. |
-| entropy           | double precision | Shannon entropy of super_category distribution (bits). |
-| entropy_fclass    | double precision | Shannon entropy of fclass distribution (bits). |
-| aggregate_score   | double precision | Aggregate POI score 0–100 (NULL if not computed). |
-| acc_bus_stop, acc_pharmacy, … (13 booleans) | boolean | Accessibility flags within 400 m (bus_stop, pharmacy, school, hospital, supermarket, bank, atm, clinic, fuel, police, park, doctors, taxi). |
-| by_category       | jsonb     | POI count per super_category (1 km). |
-| nearest_km        | jsonb     | Distance in km to nearest POI per super_category. |
-| dist_coast_km     | double precision | Distance in km to nearest OSM coastline segment. NULL when `geo.coastline` is not loaded. |
-| land_buffer_fraction_1km | double precision | Fraction of the 1 km analysis buffer that lies on land (0.0–1.0). Used to normalise density for coastal properties. NULL when `geo.coastline`/`geo.land` are not loaded. |
-| transaction_date  | date      | Date used for temporal POI lookup. NULL when scored against the current POI snapshot. |
-| poi_source        | text      | `'history'` when scored from `osm_history.poi_history_active`; `'current'` when scored from `production.pois_current`. |
+| Column | Type | Description |
+|--------|------|-------------|
+| `run_timestamp` | timestamptz | When the external POI pipeline finished |
+| (other columns) | — | Run metadata maintained by the external pipeline |
 
-Index: `property_features(poi_refreshed_at)` for “pending” queries. When the POI dataset is refreshed, the pipeline recomputes all properties and overwrites rows (one row per property_id); `poi_refreshed_at` records the POI version timestamp used (from audit.pipeline_runs).
+The feature pipeline uses `max(run_timestamp)` as the current POI version (`poi_refreshed_at`). This app does **not** write to this table.
+
+For taxonomy (`active.categories`, `active.category_mapping`) and full export details, see [`data/README.md`](../data/README.md).
 
 ---
 
-## Future migration strategy
+## Geo reference (app-owned — local bootstrap)
 
-In production the DB is managed elsewhere; for local/dev, schema and data come from a dump or `init_schema_ci.sql` (CI). For **future** schema changes in this repo (new tables, columns, or indexes), prefer one of:
+Created by [`scripts/schema/feature_pipeline.sql`](../scripts/schema/feature_pipeline.sql). Populate once per fresh database.
 
-- **Versioned migrations** (e.g. Alembic): introduce a baseline revision matching the current state, then add incremental migrations. Initial data load remains dump + runbook; migrations apply only for DDL changes after the baseline.
-- **Documented process**: if migrations are not adopted, apply schema changes via a new dump or manual SQL, and update this doc and the runbook.
+### `geo.coastline`
 
-Until a migration tool is in place, any schema change must be reflected in the dump or in `init_schema_ci.sql` and documented here.
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | serial | Primary key |
+| `name` | text | Optional label |
+| `geom` | geometry(MultiLineString, 4326) | Coastline segments |
+
+Load: `python scripts/ingest/load_osm_coastline.py`
+
+### `geo.land`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | serial | Primary key |
+| `name` | text | Optional label |
+| `geom` | geometry(MultiPolygon, 4326) | Land polygon(s) |
+
+Load: `python scripts/ingest/load_osm_land.py`
+
+Without these tables, `dist_coast_km` and `land_buffer_fraction_1km` are NULL.
+
+---
+
+## Feature pipeline tables (app-owned)
+
+Created by [`scripts/schema/apply_feature_pipeline.py`](../scripts/schema/apply_feature_pipeline.py). See [RUNBOOK](RUNBOOK.md#feature-engineering-pipeline).
+
+### `production.properties` (pipeline input)
+
+Slim index of locations to score. Only pipeline-needed columns — rich transaction data lives in the source transactions table (e.g. `analytics.transactions` in prod, `staging.transactions` in dev).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `transaction_id` | bigint | Primary key — join key to source transactions |
+| `latitude` | double precision | WGS84 latitude |
+| `longitude` | double precision | WGS84 longitude |
+| `transaction_date` | date | Used by `historical_batch` for temporal POI lookup |
+
+Dev: [`scripts/ingest/load_properties_from_parquet.py`](../scripts/ingest/load_properties_from_parquet.py) loads parquet into `staging.transactions` and syncs slim rows here. Prod: external ETL copies coords from the 1M-row transactions table. Set `TRANSACTIONS_TABLE` so the Properties dashboard can join attributes at read time.
+
+### `production.property_features` (output — ML input)
+
+One row per property; flattened spatial indicators. The ML team reads this table directly — no API calls needed.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `transaction_id` | bigint | PK, FK → `properties(transaction_id)` — join directly to source transactions |
+| `poi_refreshed_at` | timestamptz | POI version used — **use for reproducibility** |
+| `pipeline_version` | text | Pipeline code version |
+| `computed_at` | timestamptz | When the row was written |
+| `poi_count_1km` | integer | POIs within 1 km |
+| `poi_count_400m` | integer | POIs within 400 m |
+| `n_categories` | integer | Distinct super_categories within 1 km |
+| `n_poi_types` | integer | Distinct fclass values within 1 km |
+| `entropy` | double precision | Shannon entropy of super_category (bits) |
+| `entropy_fclass` | double precision | Shannon entropy of fclass (bits) |
+| `aggregate_score` | double precision | Aggregate score 0–100 (nullable) |
+| `acc_*` (13 booleans) | boolean | Accessibility within 400 m |
+| `by_category` | jsonb | POI count per super_category (1 km) |
+| `nearest_km` | jsonb | Distance to nearest POI per super_category |
+| `dist_coast_km` | double precision | Distance to coastline (NULL if geo not loaded) |
+| `land_buffer_fraction_1km` | double precision | Fraction of 1 km buffer on land |
+| `transaction_date` | date | Date used for temporal POI lookup (nullable) |
+| `poi_source` | text | `'history'` or `'current'` |
+
+Index: `property_features(poi_refreshed_at)` for pending-property queries.
+
+### `production.feature_pipeline_runs` and `production.feature_pipeline_failures`
+
+Run ledger for pipeline executions. Defined in [`scripts/schema/feature_pipeline_runs.sql`](../scripts/schema/feature_pipeline_runs.sql).
+
+Key columns on `feature_pipeline_runs`: `run_id`, `flow_name`, `status`, `started_at`, `finished_at`, `processed`, `failed`, `poi_refreshed_at`, `triggered_by`.
+
+See [`backend/app/features/feature_pipeline/README.md`](../backend/app/features/feature_pipeline/README.md) for query examples.
+
+---
+
+## CI minimal schema
+
+For tests without a full dump, CI applies [`scripts/schema/init_schema_ci.sql`](../scripts/schema/init_schema_ci.sql), which creates empty `active.production_pois_current` and `history.production_poi_history` with the contract columns above.
+
+---
+
+## Schema change policy
+
+- **Production POI schema:** managed by the external pipeline — changes happen outside this repo.
+- **App schema (`production.*`, `geo.*`):** apply via `scripts/schema/` SQL and update this doc in the same MR.
+- **When renaming tables:** update `backend/app/core/tables.py` first, then this file, [RUNBOOK](RUNBOOK.md), and [scripts/README.md](../scripts/README.md).

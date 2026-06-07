@@ -34,17 +34,24 @@ CREATE TABLE IF NOT EXISTS geo.land (
 CREATE INDEX IF NOT EXISTS idx_geo_land_geom
     ON geo.land USING GIST (geom);
 
--- Input: portfolio of properties (id, coordinates, optional metadata).
+-- Input: slim pipeline index keyed by the external transaction id (one sale event).
+-- Rich attributes (price, admin hierarchy, geometry) live in the source
+-- transactions table (another schema); populated by external ETL or the dev parquet loader.
 CREATE TABLE IF NOT EXISTS production.properties (
-    id bigint PRIMARY KEY,
+    transaction_id bigint PRIMARY KEY,
     latitude double precision NOT NULL,
     longitude double precision NOT NULL,
-    metadata jsonb
+    transaction_date date
 );
 
--- Output: one row per property, flattened spatial indicators (ML input).
+CREATE INDEX IF NOT EXISTS idx_properties_transaction_date
+    ON production.properties (transaction_date);
+
+-- Output: one row per transaction, flattened spatial indicators (ML input).
+-- transaction_id is denormalized so ML/analytics can join directly to the
+-- source transactions table without going through production.properties.
 CREATE TABLE IF NOT EXISTS production.property_features (
-    property_id bigint PRIMARY KEY REFERENCES production.properties(id) ON DELETE CASCADE,
+    transaction_id bigint PRIMARY KEY REFERENCES production.properties(transaction_id) ON DELETE CASCADE,
     poi_refreshed_at timestamptz NOT NULL,
     pipeline_version text NOT NULL,
     computed_at timestamptz NOT NULL DEFAULT now(),
@@ -84,3 +91,6 @@ CREATE TABLE IF NOT EXISTS production.property_features (
 
 CREATE INDEX IF NOT EXISTS idx_property_features_poi_refreshed_at
     ON production.property_features(poi_refreshed_at);
+
+-- Run ledger tables: scripts/schema/feature_pipeline_runs.sql
+-- (also auto-created on first pipeline run)

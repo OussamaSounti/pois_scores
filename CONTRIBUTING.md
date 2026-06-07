@@ -43,9 +43,13 @@ To run on all files once: `pre-commit run --all-files`. Pre-commit runs the same
 
 ## Documentation
 
-- [README.md](README.md) — Overview, quick start, run tests, env vars.
-- [PROJECT_SPEC.md](PROJECT_SPEC.md) — Full specification and phased plan.
-- [docs/](docs/) — RUNBOOK, DATA_MODEL, ARCHITECTURE, DEPLOYMENT, OBSERVABILITY.
+- **[docs/README.md](docs/README.md)** — Documentation hub (start here)
+- [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) — First-run tutorial
+- [README.md](README.md) — Project overview
+- [PROJECT_SPEC.md](PROJECT_SPEC.md) — Product specification (as implemented)
+- [docs/RUNBOOK.md](docs/RUNBOOK.md) — Operations
+- [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — Schema reference
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System design
 
 ## GitLab and operations
 

@@ -13,13 +13,21 @@ _SessionLocal: sessionmaker[Session] | None = None
 
 
 def get_engine() -> Engine:
-    """Return the shared SQLAlchemy engine; creates it on first call."""
+    """Return the shared SQLAlchemy engine; creates it on first call.
+
+    Pool is sized for pipeline parallelism (pool_size workers + overflow).
+    pool_recycle prevents stale connections during multi-hour batch runs.
+    """
     global _engine
     if _engine is None:
         settings = get_settings()
         _engine = create_engine(
             settings.database_url,
             pool_pre_ping=True,
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_max_overflow,
+            pool_recycle=1800,
+            pool_timeout=30,
             echo=(settings.log_level.lower() == "debug"),
         )
     return _engine

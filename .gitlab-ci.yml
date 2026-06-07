@@ -18,7 +18,7 @@ variables:
 lint:
   stage: lint
   before_script:
-    - pip install ruff
+    - pip install -r backend/requirements-dev.txt
   script:
     - ruff check backend/
     - ruff format --check backend/
@@ -31,7 +31,7 @@ test:
   variables:
     POSTGRES_HOST_AUTH_METHOD: trust
   before_script:
-    - pip install -r backend/requirements.txt
+    - pip install -r backend/requirements-dev.txt
     - sleep 5
     - python scripts/schema/apply_init.py
   script:

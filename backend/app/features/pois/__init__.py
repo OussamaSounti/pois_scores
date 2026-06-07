@@ -10,6 +10,8 @@ from app.features.pois.service import (
     PoiRow,
     get_pois_with_distance,
     get_pois_with_distance_at_date,
+    query_pois_combined,
+    query_pois_combined_at_date,
     query_pois_radius,
     query_pois_radius_at_date,
 )
@@ -18,6 +20,8 @@ __all__ = [
     "PoiRow",
     "get_pois_with_distance",
     "get_pois_with_distance_at_date",
+    "query_pois_combined",
+    "query_pois_combined_at_date",
     "query_pois_radius",
     "query_pois_radius_at_date",
     "router",

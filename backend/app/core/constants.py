@@ -53,8 +53,17 @@ __all__ = [
     "MAX_POI_QUERY_RADIUS_M",
     "N_FCLASS_TYPES",
     "N_SUPER_CATEGORIES",
+    "PIPELINE_FLOW_HISTORICAL",
+    "PIPELINE_FLOW_WEEKLY",
     "POI_SOURCE_CURRENT",
     "POI_SOURCE_HISTORY",
+    "RUN_STATUS_FAILED",
+    "RUN_STATUS_PARTIAL",
+    "RUN_STATUS_RUNNING",
+    "RUN_STATUS_SKIPPED",
+    "RUN_STATUS_SUCCESS",
+    "TRIGGERED_BY_CLI",
+    "TRIGGERED_BY_PREFECT",
     "PROPERTIES_MAP_DEFAULT_LIMIT",
     "PROPERTIES_MAP_MAX_LIMIT",
     "PROPERTY_FEATURE_COLUMNS",
@@ -64,7 +73,7 @@ ACC_KEYS: tuple[str, ...] = tuple(sorted(ACCESSIBILITY_KEY_TYPES))
 ACC_COLUMN_NAMES: tuple[str, ...] = tuple(f"acc_{k}" for k in ACC_KEYS)
 
 PROPERTY_FEATURE_COLUMNS: tuple[str, ...] = (
-    "property_id",
+    "transaction_id",
     "poi_refreshed_at",
     "pipeline_version",
     "computed_at",
@@ -100,6 +109,18 @@ PROPERTIES_MAP_MAX_LIMIT: int = 5000
 
 POI_SOURCE_HISTORY: str = "history"
 POI_SOURCE_CURRENT: str = "current"
+
+PIPELINE_FLOW_WEEKLY: str = "weekly_continuous"
+PIPELINE_FLOW_HISTORICAL: str = "historical_batch"
+
+RUN_STATUS_RUNNING: str = "running"
+RUN_STATUS_SUCCESS: str = "success"
+RUN_STATUS_PARTIAL: str = "partial"
+RUN_STATUS_FAILED: str = "failed"
+RUN_STATUS_SKIPPED: str = "skipped"
+
+TRIGGERED_BY_CLI: str = "cli"
+TRIGGERED_BY_PREFECT: str = "prefect"
 
 HIERARCHY_LEVELS: tuple[str, ...] = ("district", "neighbourhood", "iris", "ilot")
 HIERARCHY_LEVEL_PATTERN: str = "^(" + "|".join(HIERARCHY_LEVELS) + ")$"

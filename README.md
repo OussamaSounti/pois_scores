@@ -1,185 +1,129 @@
 # Morocco Spatial Dashboard
 
-POI-based spatial scores for any location in Morocco. Single-location and batch endpoints; dashboard for analysts and internal tools. **Production:** the database is already set up and refreshed by another pipeline; this app connects and uses it directly. **Local/dev:** optional dump or minimal schema for testing.
+POI-based spatial scores for any location in Morocco. Single-location and batch API endpoints; React dashboard for analysts and internal tools.
 
-## Repository (GitLab)
-
-This project is version-controlled on **GitLab**. Clone and push via GitLab:
-
-```bash
-# Clone (replace with your GitLab repo URL)
-git clone https://gitlab.com/your-group/morocco-spatial-dashboard.git
-cd morocco-spatial-dashboard
-
-# Or if you created a new repo: init and push
-git init
-git remote add origin https://gitlab.com/your-group/morocco-spatial-dashboard.git
-git add .
-git commit -m "chore: Phase 0 foundation — Docker Postgres, docs, env example"
-git push -u origin main
-```
-
-Use the `main` branch as default; use feature branches and Merge Requests for changes. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute.
-
-## Prerequisites
-
-- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
-- [Git](https://git-scm.com/)
-- Python 3.11+ for running the backend
-
-## Quick start
-
-1. **Copy environment file**
-   ```bash
-   cp .env.example .env
-   ```
-   Edit `.env` if you change the DB user, password, or database name (they must match `docker-compose.yml` and the restore step).
-
-2. **Start the stack (DB + backend + pgAdmin)**
-   ```bash
-   docker compose up -d
-   ```
-   This starts the database, the backend API, and pgAdmin. The pipeline service is not started by default; run it on demand with `docker compose run --rm pipeline`. Wait until all are up (`docker compose ps`).
-
-   | Service | URL |
-   |---------|-----|
-   | Backend API + docs | http://localhost:8000/docs |
-   | pgAdmin | http://localhost:5050 (login: `admin@admin.com` / `admin`) |
-
-   To start only Postgres (e.g. to restore the dump first):
-   ```bash
-   docker compose up -d db
-   ```
-
-3. **Load geo reference data (required once)**
-   ```bash
-   python scripts/load_osm_coastline.py   # populates geo.coastline
-   python scripts/load_osm_land.py        # populates geo.land
-   ```
-   Without these, `dist_coast_km` and `land_buffer_fraction_1km` will be NULL for all properties. See [docs/RUNBOOK.md](docs/RUNBOOK.md#load-geo-reference-data-required-once-per-fresh-db).
-
-4. **Optional (local): restore a POI dump and load properties**
-   For local data, restore a PostgreSQL dump (`.dump` or `.sql`) after the first start. Then load your properties Parquet file:
-   ```bash
-   cd backend
-   python scripts/load_properties_from_parquet.py --parquet ../input/your_file.parquet
-   ```
-   See [docs/RUNBOOK.md](docs/RUNBOOK.md) for full commands. Production uses the existing DB; no restore.
-
-5. **Document the schema**
-   After restore, inspect tables in `psql` and record any changes in [docs/DATA_MODEL.md](docs/DATA_MODEL.md). The backend will use this to query POIs (no schema creation in code).
-
-## Run the API (local, without Docker)
-
-With Postgres running and the dump restored:
-
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-- **API docs:** http://localhost:8000/docs  
-- **Single-location score:** GET or POST `/api/v1/scores` (query params or body `{"lat": 33.5, "lon": -7.6}`)  
-- **Health:** GET `/health`, GET `/ready`
-
-Set `DATABASE_URL` in `.env` at the project root (or export it) so the backend can connect to Postgres; the app loads `.env` from the current working directory when run from `backend/`. When using **Docker Compose**, the backend container uses `DATABASE_URL` with host `db` (set in `docker-compose.yml`).
-
-## Run the dashboard (Phase 4)
-
-The dashboard is a React app: left sidebar (coords + Run + metrics), center map, right panel (POI list). It calls the backend score API and the POI list endpoint.
-
-1. Start the API: `docker compose up -d` or `cd backend && uvicorn app.main:app --reload --port 8000`.
-2. From project root: `cd frontend && npm install && npm run dev`. Open http://localhost:3000.
-
-**Single tab**
-
-- Enter coordinates and click Run, or **double‑click** the map to analyze that location.
-- Metrics: overview (1 km / 400 m), category density, accessibility 400 m, nearest by category. Use **?** for explanations.
-- Map shows the location, 1 km / 400 m circles, and POIs; right panel lists POIs within 1 km. Click a POI in the list to focus it on the map.
-- **Filter by metric:** Click a **row** in "Category density", "Accessibility", or "Nearest · by category" to show only related POIs on the map and list. "Nearest" shows only the nearest POI per category. Use **Show all** to clear the filter.
-
-**Batch tab**
-
-- Paste coordinates (one `lat lon` or `lat,lon` per line), or **drag & drop** / choose a CSV or JSON file. Lat/lon columns are auto-detected; row labels (e.g. id, name) link results to your input.
-- Run batch → results table. **Click a row** to switch to the Single tab and view that site on the map.
-- **Export CSV** to download full scores (including `input_row` when loaded from a file).
-
-Set `VITE_API_URL` in `frontend/.env` to point to another API base (e.g. `http://localhost:8000`).
-
-## Scripts layout
-
-| Folder | Contents | When to use |
-|--------|----------|-------------|
-| `scripts/` | `load_osm_coastline.py`, `load_osm_land.py` | Geo reference data loaders — run from project root |
-| `backend/scripts/` | `load_properties_from_parquet.py`, schema SQL/runners | App scripts that depend on the Python package — run from `backend/` |
+**Production:** the database is set up and refreshed by an external POI pipeline — this app connects via `DATABASE_URL`.  
+**Local/dev:** optional dump or minimal schema for testing.
 
 ---
 
-## Feature engineering pipeline
+## Quick start
 
-An automated pipeline computes spatial indicators for every property in `production.properties` and writes them to `production.property_features` (direct ML input; no API calls). It reuses the same spatial logic as the API. Apply the pipeline schema once (see [docs/RUNBOOK.md](docs/RUNBOOK.md#feature-engineering-pipeline)), then run on demand or on a schedule (e.g. nightly): `docker compose run --rm pipeline`. POI versioning comes from **`audit.pipeline_runs.run_timestamp`** (maintained by the external POI refresh pipeline). When POI data is refreshed, the next pipeline run recomputes features for the entire portfolio. Each row in `property_features` stores `poi_refreshed_at` for reproducibility.
+1. Copy env: `cp .env.example .env`
+2. Start stack: `docker compose up -d`
+3. Follow the full walkthrough: **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)**
 
-## Run tests
+| Service | URL |
+|---------|-----|
+| Backend API + OpenAPI | http://localhost:8000/docs |
+| Dashboard (after `npm run dev`) | http://localhost:3000 |
+| pgAdmin | http://localhost:5050 |
 
-From the `backend/` directory:
+---
+
+## What this project does
+
+- **Scores any point in Morocco** using nearby POIs — density, diversity, accessibility, nearest distances, coastal signals.
+- **Serves a REST API** (`/api/v1/scores`, `/pois`, `/properties`, `/geo/*`) and a **React dashboard** (Single, Batch, Properties tabs).
+- **Runs an offline pipeline** that precomputes features into `production.property_features` for ML and the Properties map.
+
+Two scoring modes:
+
+| Mode | When | Where results live |
+|------|------|-------------------|
+| **Live API** | On-demand per request | Response JSON |
+| **Batch pipeline** | Scheduled or manual | `production.property_features` table |
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full data flow.
+
+---
+
+## Repository layout
+
+| Path | Purpose |
+|------|---------|
+| `backend/` | FastAPI app, feature pipeline, tests |
+| `frontend/` | React + Vite dashboard |
+| `scripts/` | Schema apply, geo ingest, parquet load — [scripts/README.md](scripts/README.md) |
+| `docs/` | Central documentation hub — **[docs/README.md](docs/README.md)** |
+| `data/` | POI database export — [data/README.md](data/README.md) |
+
+---
+
+## Common commands
 
 ```bash
-cd backend
-pip install -r requirements.txt
-pytest                    # all tests (integration skipped if DB down)
-pytest tests/unit -v      # unit only
-pytest --cov=app          # with coverage
-```
-Run integration tests (Postgres must be running and dump restored):
-```bash
-docker compose up -d db
-pytest tests/integration -v
+# Geo reference (once per fresh DB)
+python scripts/ingest/load_osm_coastline.py
+python scripts/ingest/load_osm_land.py
+
+# Apply app schema
+python scripts/schema/apply_feature_pipeline.py
+
+# Load properties
+python scripts/ingest/load_properties_from_parquet.py --parquet input/your_file.parquet
+
+# Run feature pipeline
+docker compose --profile pipeline run --rm pipeline
+
+# Backend tests
+cd backend && pytest tests/unit -v
+
+# Frontend dev server
+cd frontend && npm install && npm run dev
 ```
 
-- **Unit tests** (entropy, haversine): always run, no DB required.
-- **Integration tests** (API single + batch): run only when Postgres is up and the dump is restored; otherwise they are skipped. Use `pytest -v` for verbose output, `pytest --cov=app` for coverage.
+Full command reference: [scripts/README.md](scripts/README.md) and [docs/RUNBOOK.md](docs/RUNBOOK.md).
+
+---
 
 ## Environment variables
 
-| Variable           | Description                    | Example |
-|--------------------|--------------------------------|---------|
-| `DATABASE_URL`     | PostgreSQL connection string   | `postgresql://poi_user:poi_password@localhost:5432/poi_db` |
-| `LOG_LEVEL`        | Log level (debug, info, etc.)  | `info`  |
-| `CORS_ORIGINS`     | Allowed origins (comma-separated) | `http://localhost:3000` |
-| `PIPELINE_VERSION` | Version label written to property_features (pipeline only) | `1.0` |
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://poi_user:poi_password@localhost:5432/poi_db` |
+| `LOG_LEVEL` | Log level | `info` |
+| `CORS_ORIGINS` | Allowed origins (comma-separated) | `http://localhost:3000` |
+| `PIPELINE_VERSION` | Label written to property_features | `1.0` |
+| `VITE_API_URL` | Frontend API base (frontend only) | `http://localhost:8000` |
 
-See `.env.example` for a template. Do not commit `.env`.
+See `.env.example`. Do not commit `.env`.
+
+---
 
 ## Documentation
 
-- [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md) — Tech stack, coding and naming conventions, typing, testing, CI/CD, and security baseline
-- [docs/RELEASE_AND_DEPLOY.md](docs/RELEASE_AND_DEPLOY.md) — Branch flow, versioning, deployment, and rollback
-- [CHANGELOG.md](CHANGELOG.md) — Version history
-- [docs/RUNBOOK.md](docs/RUNBOOK.md) — Restore dump, run Postgres, pipeline schema and run, POI refresh
-- [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — POI table(s) and columns (from restored dump)
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System context and data flow
-- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — Development and production-like deployment
-- [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) — Logging, health, metrics, and monitoring
-- [PROJECT_SPEC.md](PROJECT_SPEC.md) — Full project specification and phased plan
+**Start here:** [docs/README.md](docs/README.md)
+
+| Doc | Purpose |
+|-----|---------|
+| [GETTING_STARTED.md](docs/GETTING_STARTED.md) | First-run tutorial |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design and data flows |
+| [DATA_MODEL.md](docs/DATA_MODEL.md) | Schemas and tables |
+| [RUNBOOK.md](docs/RUNBOOK.md) | Operations and pipeline |
+| [ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md) | Coding conventions and CI |
+| [PROJECT_SPEC.md](PROJECT_SPEC.md) | Product specification |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
+
+Module-level docs live next to code — see the index in [docs/README.md](docs/README.md).
+
+---
 
 ## CI/CD (GitLab)
 
-The pipeline (`.gitlab-ci.yml`) runs on push:
+Pipeline (`.gitlab-ci.yml`) on push:
 
-- **lint:** Ruff check and format on `backend/`
-- **test:** Postgres (PostGIS) service, init minimal schema, then `pytest` with coverage; the job fails if coverage is below 70%
-- **build:** Docker build of the backend image (on the default branch)
+- **lint:** Ruff on `backend/`
+- **test:** PostGIS service → `apply_init.py` → pytest (70% coverage floor)
+- **build:** Docker backend image (default branch)
+- **frontend:** lint, format, test, build
 
-Ensure `.env` is not committed; CI uses its own variables and the Postgres service.
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/RELEASE_AND_DEPLOY.md](docs/RELEASE_AND_DEPLOY.md).
 
-## Project phases (complete)
+---
 
-| Phase | Deliverable |
-|-------|-------------|
-| 0 | Repo, Docker Postgres (PostGIS), env, runbook for dump restore |
-| 1 | Single-location score API, health/ready, OpenAPI |
-| 2 | Batch score API, validation, unit and integration tests |
-| 3 | Backend Dockerfile, docker-compose backend + db, GitLab CI (lint, test, build) |
-| 4 | Dashboard: Single tab (map, metrics, POI list, filters), Batch tab (file drop, CSV/JSON, export, row → Single) |
-| 5 | ARCHITECTURE.md, DEPLOYMENT.md, RUNBOOK and DATA_MODEL; real DB = `DATABASE_URL` only |
+## Contributing
+
+Work on feature branches from `main`. Open Merge Requests; ensure CI passes. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Prerequisites: [backend/REQUIREMENTS.md](backend/REQUIREMENTS.md) for Python setup.
