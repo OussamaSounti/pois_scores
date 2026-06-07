@@ -25,8 +25,17 @@ class Settings(BaseSettings):
     log_level: str = "info"
     cors_origins: str = "http://localhost:3000,http://localhost:8000"
 
+    # Fully-qualified source transactions table for dashboard joins and property sync.
+    # Example: analytics.transactions. Empty = no join (slim properties only).
+    transactions_table: str = ""
+
     # Version label written to production.property_features.pipeline_version.
     pipeline_version: str = "1.0"
+
+    # Connection pool tuning for batch pipeline workloads.
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+    pipeline_workers: int = 4
 
     # Overpass / OSM ingest. Used by scripts/ingest/load_osm_*.py.
     overpass_url: str = "https://overpass-api.de/api/interpreter"

@@ -1,0 +1,5 @@
+# Prefect pipeline (API + orchestration)
+
+-r requirements.txt
+
+prefect==3.7.4

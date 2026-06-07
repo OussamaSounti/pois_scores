@@ -30,6 +30,8 @@ from app.features.pois.service import (
     PoiRow,
     _nearest_km_by_category,
     _nearest_km_by_category_at_date,
+    query_pois_combined,
+    query_pois_combined_at_date,
     query_pois_radius,
     query_pois_radius_at_date,
 )
@@ -92,10 +94,12 @@ def _aggregate_components(
 
 
 def compute_scores(session: Session, lat: float, lon: float) -> dict[str, Any]:
-    """Score (lat, lon) against ``active.production_pois_current``."""
-    pois_1km = query_pois_radius(session, lat, lon, 1000.0)
-    pois_400m = query_pois_radius(session, lat, lon, 400.0)
-    nearest_km = _nearest_km_by_category(session, lat, lon)
+    """Score (lat, lon) against ``active.production_pois_current``.
+
+    Uses a combined CTE query (1 round-trip for POIs + nearest) plus
+    1 round-trip for coastal features = 2 total instead of 5.
+    """
+    pois_1km, pois_400m, nearest_km = query_pois_combined(session, lat, lon)
     dist_coast = _dist_coast_km(session, lat, lon)
     land_frac = land_fraction_at_point(session, lat, lon, dist_coast)
     payload = _aggregate_components(pois_1km, pois_400m, nearest_km, land_frac)
@@ -111,13 +115,12 @@ def compute_scores_at_date(
 ) -> dict[str, Any]:
     """Score (lat, lon) against ``history.production_poi_history`` at *as_of*.
 
-    Coastal features (``dist_coast_km``, ``land_buffer_fraction_1km``) come
-    from the static ``geo.coastline`` / ``geo.land`` reference tables and are
-    therefore identical to the current-snapshot path.
+    Uses a combined CTE query (1 round-trip for POIs + nearest) plus
+    1 round-trip for coastal features = 2 total instead of 5.
     """
-    pois_1km = query_pois_radius_at_date(session, lat, lon, 1000.0, as_of)
-    pois_400m = query_pois_radius_at_date(session, lat, lon, 400.0, as_of)
-    nearest_km = _nearest_km_by_category_at_date(session, lat, lon, as_of)
+    pois_1km, pois_400m, nearest_km = query_pois_combined_at_date(
+        session, lat, lon, as_of
+    )
     dist_coast = _dist_coast_km(session, lat, lon)
     land_frac = land_fraction_at_point(session, lat, lon, dist_coast)
     payload = _aggregate_components(pois_1km, pois_400m, nearest_km, land_frac)

@@ -17,18 +17,22 @@ from app.core.config import get_settings  # noqa: E402
 
 
 def main() -> int:
-    """Execute ``feature_pipeline.sql`` against the configured DSN."""
+    """Execute pipeline schema SQL files against the configured DSN."""
     settings = get_settings()
     if not settings.database_url:
         print("Database DSN is not configured (settings.database_url is empty)", file=sys.stderr)
         return 1
-    sql_path = Path(__file__).resolve().parent / "feature_pipeline.sql"
-    sql = sql_path.read_text()
+    schema_dir = Path(__file__).resolve().parent
+    sql_files = (
+        schema_dir / "feature_pipeline.sql",
+        schema_dir / "feature_pipeline_runs.sql",
+    )
     try:
         conn = psycopg2.connect(settings.database_url)
         conn.autocommit = True
         with conn.cursor() as cur:
-            cur.execute(sql)
+            for sql_path in sql_files:
+                cur.execute(sql_path.read_text(encoding="utf-8"))
         conn.close()
         print("Pipeline schema applied successfully.")
         return 0

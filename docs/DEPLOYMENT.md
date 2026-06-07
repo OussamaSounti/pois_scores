@@ -21,7 +21,7 @@ How to run the stack for development and production-like environments.
    ```bash
    docker compose up -d db
    # Optionally restore dump for local data, then:
-   cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload --port 8000
+   cd backend && pip install -r requirements-dev.txt && uvicorn app.main:app --reload --port 8000
    ```
    Set `DATABASE_URL` in `.env` (e.g. `postgresql://poi_user:poi_password@localhost:5432/poi_db`).
 
@@ -40,4 +40,11 @@ How to run the stack for development and production-like environments.
 | `CORS_ORIGINS` | Backend   | Comma-separated allowed origins for the API. |
 | `VITE_API_URL` | Frontend  | Optional; API base URL at build time (e.g. `https://api.example.com`). |
 
-No secrets in the repo; provide real values via `.env` (not committed) or the deployment platform’s config.
+No secrets in the repo; provide real values via `.env` (not committed) or the deployment platform's config.
+
+## See also
+
+- [GETTING_STARTED.md](GETTING_STARTED.md) — first-run tutorial
+- [RUNBOOK.md](RUNBOOK.md) — operations
+- [RELEASE_AND_DEPLOY.md](RELEASE_AND_DEPLOY.md) — release process
+- [docs/README.md](README.md) — documentation hub

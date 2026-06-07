@@ -20,6 +20,21 @@ location scores. Used by both the on-demand HTTP API and the offline
 | `service.py` | Core math: density, diversity, accessibility, aggregate    |
 | `schemas.py` | Pydantic request/response models (`ScoresPayload`, etc.)   |
 
+## Scoring Pipeline (per location)
+
+Each call to `compute_scores()` or `compute_scores_at_date()` executes:
+
+1. **Combined POI CTE query** (1 round-trip) — fetches all POIs within
+   25 km, splits into 1 km / 400 m buckets in Python, and computes
+   nearest-by-category from the same result set.
+2. **Coastal query** (1 round-trip) — distance to coastline + land
+   fraction for density correction.
+3. **Pure math** (in-memory) — entropy, diversity, accessibility,
+   aggregate score.
+
+Total: **2 DB round-trips per location** (reduced from 5 in the
+original design).
+
 ## Public API (via `__init__.py`)
 
 ```python

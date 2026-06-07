@@ -1,13 +1,24 @@
-# Morocco Spatial Dashboard — backend API
+# Morocco Spatial Dashboard — backend API / pipeline
 # Multi-stage; run as non-root.
+#
+# Build API image (default):
+#   docker build -t backend-api ./backend
+# Build pipeline image (includes Prefect):
+#   docker build --build-arg INSTALL_TARGET=pipeline -t backend-pipeline ./backend
 
 FROM python:3.12-slim AS builder
+
+ARG INSTALL_TARGET=api
 
 WORKDIR /build
 
 RUN pip install --no-cache-dir --upgrade pip
-COPY requirements.txt .
-RUN pip wheel --no-cache-dir --no-deps -w /wheels -r requirements.txt
+COPY requirements.txt requirements-pipeline.txt ./
+RUN if [ "$INSTALL_TARGET" = "pipeline" ]; then \
+      pip install --no-cache-dir -r requirements-pipeline.txt; \
+    else \
+      pip install --no-cache-dir -r requirements.txt; \
+    fi
 
 FROM python:3.12-slim AS runtime
 
@@ -15,12 +26,11 @@ ENV PYTHONUNBUFFERED=1 \
     PORT=8000 \
     PYTHONPATH=/app
 
-# Non-root user
 RUN adduser --disabled-password --gecos "" appuser
 WORKDIR /app
 
-COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY app ./app
 RUN chown -R appuser:appuser /app
