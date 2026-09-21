@@ -8,14 +8,28 @@ import { CAT_COLORS } from '../constants';
 const MOROCCO_CENTER: [number, number] = [31.7917, -7.0926];
 const MOROCCO_ZOOM = 6;
 const LOCATION_ZOOM = 15;
-const CARTO_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-const CARTO_ATTR = '© OpenStreetMap © Carto';
+const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
+/** Re-centres only when the coordinates actually change (not on every parent render). */
 function SetView({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap();
+  const [lat, lon] = center;
   useEffect(() => {
-    map.setView(center, zoom);
-  }, [map, center, zoom]);
+    map.setView([lat, lon], zoom);
+  }, [map, lat, lon, zoom]);
+  return null;
+}
+
+/** Keeps Leaflet's internal size in sync when the container resizes (e.g. side panels appearing). */
+function ResizeHandler() {
+  const map = useMap();
+  useEffect(() => {
+    const el = map.getContainer();
+    const ro = new ResizeObserver(() => map.invalidateSize({ animate: false }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [map]);
   return null;
 }
 
@@ -47,10 +61,10 @@ function CenterMarker({ lat, lon }: { lat: number; lon: number }) {
 function poiIconForCategory(superCategory: string) {
   const color = CAT_COLORS[superCategory] ?? '#8a93b2';
   return L.divIcon({
-    html: `<div style="width:9px;height:9px;border-radius:50%;background:${color};border:1.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.2)"></div>`,
+    html: `<div style="width:11px;height:11px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,0.25),0 1px 4px rgba(0,0,0,0.35)"></div>`,
     className: '',
-    iconSize: [9, 9],
-    iconAnchor: [4, 4],
+    iconSize: [11, 11],
+    iconAnchor: [5, 5],
   });
 }
 
@@ -66,9 +80,9 @@ function FlyToPoi({
   markerRefs,
 }: {
   pois: PoiItem[];
-  focusedPoiId: number | null;
+  focusedPoiId: string | null;
   onFocusComplete: () => void;
-  markerRefs: React.MutableRefObject<Record<number, L.Marker | null>>;
+  markerRefs: React.MutableRefObject<Record<string, L.Marker | null>>;
 }) {
   const map = useMap();
   useEffect(() => {
@@ -92,7 +106,7 @@ function FlyToPoi({
 type Props = {
   center: [number, number] | null;
   pois: PoiItem[];
-  focusedPoiId?: number | null;
+  focusedPoiId?: string | null;
   onFocusComplete?: () => void;
   onLocationSelect: (lat: number, lon: number) => void;
 };
@@ -106,7 +120,7 @@ export default function MapView({
 }: Props) {
   const mapCenter = center ?? MOROCCO_CENTER;
   const mapZoom = center ? LOCATION_ZOOM : MOROCCO_ZOOM;
-  const markerRefs = useRef<Record<number, L.Marker | null>>({});
+  const markerRefs = useRef<Record<string, L.Marker | null>>({});
   const [showCoastline, setShowCoastline] = useState(false);
   const [coastlineGeo, setCoastlineGeo] = useState<FeatureCollection | null>(null);
 
@@ -139,8 +153,9 @@ export default function MapView({
           zoomControl
           doubleClickZoom={false}
         >
+          <ResizeHandler />
           {center && <SetView center={center} zoom={LOCATION_ZOOM} />}
-          <TileLayer url={CARTO_URL} attribution={CARTO_ATTR} maxZoom={19} />
+          <TileLayer url={TILE_URL} attribution={TILE_ATTR} maxZoom={19} />
           <DblClickHandler onLocation={onLocationSelect} />
           {/* Geo verification layers */}
           {showCoastline && coastlineGeo && (

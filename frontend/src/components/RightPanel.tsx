@@ -3,7 +3,7 @@ import type { PoiItem, ScoreResponse } from '../api';
 type Props = {
   data: ScoreResponse | null;
   pois?: PoiItem[];
-  onPoiClick?: (poiId: number) => void;
+  onPoiClick?: (poiId: string) => void;
 };
 
 export default function RightPanel({ data, pois = [], onPoiClick }: Props) {

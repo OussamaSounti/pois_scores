@@ -45,15 +45,19 @@ export default function SingleView({
   const [asOf, setAsOf] = useState('');
   const [scoreData, setScoreData] = useState<ScoreResponse | null>(null);
   const [pois, setPois] = useState<PoiItem[]>([]);
-  const [focusedPoiId, setFocusedPoiId] = useState<number | null>(null);
+  const [focusedPoiId, setFocusedPoiId] = useState<string | null>(null);
   const [poiFilter, setPoiFilter] = useState<PoiFilterItem>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const filteredPois = useMemo(() => filterPoisByItem(pois, poiFilter), [pois, poiFilter]);
 
-  const center: [number, number] | null =
-    scoreData != null ? [scoreData.location.lat, scoreData.location.lon] : null;
+  const centerLat = scoreData?.location.lat;
+  const centerLon = scoreData?.location.lon;
+  const center = useMemo<[number, number] | null>(
+    () => (centerLat != null && centerLon != null ? [centerLat, centerLon] : null),
+    [centerLat, centerLon]
+  );
 
   const runAnalysis = useCallback(async (latVal: number, lonVal: number, asOfVal?: string) => {
     setError(null);

@@ -126,16 +126,16 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
               Diversity (category)
               <Tooltip text={SCORE_TOOLTIPS.entropy} />
             </div>
-            <div className="kpi-value small">{(s.entropy_norm * 100).toFixed(0)}%</div>
-            <div className="kpi-sub">{s.n_categories}/9 cats · {s.entropy.toFixed(2)} bits</div>
+            <div className="kpi-value small">{s.entropy_norm != null ? `${(s.entropy_norm * 100).toFixed(0)}%` : '—'}</div>
+            <div className="kpi-sub">{s.n_categories}/11 cats · {s.entropy.toFixed(2)} bits</div>
           </div>
           <div className="kpi-card">
             <div className="kpi-label">
               Diversity (type)
               <Tooltip text={SCORE_TOOLTIPS.entropy_fclass} />
             </div>
-            <div className="kpi-value small">{(s.entropy_fclass_norm * 100).toFixed(0)}%</div>
-            <div className="kpi-sub">{s.n_poi_types}/44 types · {s.entropy_fclass.toFixed(2)} bits</div>
+            <div className="kpi-value small">{s.entropy_fclass_norm != null ? `${(s.entropy_fclass_norm * 100).toFixed(0)}%` : '—'}</div>
+            <div className="kpi-sub">{s.n_poi_types}/91 types · {s.entropy_fclass.toFixed(2)} bits</div>
           </div>
           {s.aggregate_score != null && (
             <div className="kpi-card">

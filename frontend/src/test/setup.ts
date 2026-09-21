@@ -8,7 +8,7 @@ class ResizeObserverMock {
   unobserve() {}
   disconnect() {}
 }
-global.ResizeObserver = ResizeObserverMock;
+globalThis.ResizeObserver = ResizeObserverMock;
 
 // 2. Mock React-Leaflet to bypass JSDOM rendering limits (JSX-free)
 vi.mock('react-leaflet', () => {

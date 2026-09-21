@@ -58,7 +58,7 @@ describe('api', () => {
   it('fetchPois returns PoiItem[] when response has pois', async () => {
     const mockPois: PoiItem[] = [
       {
-        id: 1,
+        id: '1',
         name: 'Test',
         fclass: 'pharmacy',
         super_category: 'Healthcare',
