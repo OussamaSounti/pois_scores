@@ -7,7 +7,7 @@ CREATE SCHEMA IF NOT EXISTS history;
 
 -- ---------------------------------------------------------------------------
 -- active.production_pois_current — flat current snapshot
--- Contract columns only: osm_id, name, fclass, super_category, lat, lon, geom.
+-- Production dumps may use latitude/longitude; queries derive coords from geom.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS active.production_pois_current (
     osm_id          text PRIMARY KEY,
@@ -27,26 +27,42 @@ CREATE INDEX IF NOT EXISTS idx_production_pois_current_super_category
 
 -- ---------------------------------------------------------------------------
 -- history.production_poi_history — SCD2
--- Contract columns: osm_id, name, fclass, super_category, lat, lon, geom,
--- valid_from, valid_to, is_canonical. Queries MUST filter is_canonical=true
--- to deduplicate point/polygon doubles for the same physical POI.
+-- Matches the upstream pipeline export. Queries filter is_canonical = true,
+-- :as_of <@ valid_range, and deduplicate by dedup_group (see PoiRepository).
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS history.production_poi_history (
-    osm_id          text NOT NULL,
-    name            text,
-    fclass          text NOT NULL,
-    super_category  text NOT NULL,
-    lat             double precision NOT NULL,
-    lon             double precision NOT NULL,
-    geom            geometry(Point, 4326),
-    valid_from      timestamptz NOT NULL,
-    valid_to        timestamptz NOT NULL,
-    is_canonical    boolean NOT NULL DEFAULT true
+    typed_id          text NOT NULL,
+    osm_id            text NOT NULL,
+    osm_type          text NOT NULL DEFAULT 'node',
+    name              text,
+    fclass            text NOT NULL,
+    super_category    text NOT NULL,
+    geom              geometry(Point, 4326),
+    lat               double precision NOT NULL,
+    lon               double precision NOT NULL,
+    version           integer NOT NULL DEFAULT 1,
+    visible           boolean NOT NULL DEFAULT true,
+    valid_from        timestamptz NOT NULL,
+    valid_to          timestamptz NOT NULL,
+    valid_range       tstzrange GENERATED ALWAYS AS (
+        tstzrange(valid_from, valid_to, '[)')
+    ) STORED,
+    matched_tag_key   text,
+    poi_source        text,
+    tags_json         jsonb,
+    dedup_group       text NOT NULL,
+    is_canonical      boolean NOT NULL DEFAULT true
 );
 
-CREATE INDEX IF NOT EXISTS idx_production_poi_history_geom
-    ON history.production_poi_history USING GIST (geom);
+CREATE INDEX IF NOT EXISTS idx_phist_geom_geog
+    ON history.production_poi_history USING GIST (((geom)::geography));
 
-CREATE INDEX IF NOT EXISTS idx_production_poi_history_valid
-    ON history.production_poi_history (valid_from, valid_to)
+CREATE INDEX IF NOT EXISTS idx_phist_valid_range
+    ON history.production_poi_history USING GIST (valid_range);
+
+CREATE INDEX IF NOT EXISTS idx_phist_dedup_group
+    ON history.production_poi_history USING btree (dedup_group);
+
+CREATE INDEX IF NOT EXISTS idx_phist_is_canonical
+    ON history.production_poi_history USING btree (is_canonical)
     WHERE is_canonical = true;

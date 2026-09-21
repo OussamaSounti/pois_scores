@@ -5,10 +5,10 @@ only coordinates and transaction_date are copied into production.properties for 
 feature pipeline.
 
 Usage:
-  python scripts/ingest/load_properties_from_parquet.py --parquet input/casablanca_transactions_sample.parquet
+  python scripts/ingest/load_properties_from_parquet.py --parquet input/transactions.parquet
 
-Set TRANSACTIONS_TABLE=staging.transactions in .env so the Properties dashboard can
-join attributes from the same source table.
+Set TRANSACTIONS_TABLE=staging.transactions in .env so property attributes can be
+joined from the same source table at read time.
 """
 
 from __future__ import annotations

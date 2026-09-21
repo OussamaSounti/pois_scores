@@ -1,6 +1,6 @@
 """Apply ``init_schema_ci.sql`` to ``DATABASE_URL``.
 
-Used in CI to create the external POI contract tables
+Used in CI to create the empty POI tables
 (``active.production_pois_current``, ``history.production_poi_history``).
 """
 

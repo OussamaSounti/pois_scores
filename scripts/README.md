@@ -3,7 +3,7 @@
 Single execution layer for every CLI entrypoint. All scripts read settings via
 `app.core.config.get_settings()` and use the same DB DSN as the API.
 
-Documentation hub: [docs/README.md](../docs/README.md) · Operations: [docs/RUNBOOK.md](../docs/RUNBOOK.md)
+Operations: [docs/GUIDE.md](../docs/GUIDE.md)
 
 ## Layout
 
@@ -33,12 +33,12 @@ See [backend/REQUIREMENTS.md](../backend/REQUIREMENTS.md) for venv setup and oth
 
 ## Common operations
 
-| Task                                         | Command                                                              |
-|----------------------------------------------|----------------------------------------------------------------------|
-| Apply CI schema (active.* + history.*)       | `python scripts/schema/apply_init.py`                                |
-| Apply feature pipeline schema (production.*) | `python scripts/schema/apply_feature_pipeline.py`                    |
-| Load Morocco land polygon                    | `python scripts/ingest/load_osm_land.py`                             |
-| Load Morocco coastline                       | `python scripts/ingest/load_osm_coastline.py`                        |
-| Load properties from parquet                 | `python scripts/ingest/load_properties_from_parquet.py --parquet …`  |
-| Run weekly continuous flow                   | `python -m app.features.feature_pipeline weekly_continuous`          |
-| Run historical batch flow                    | `python -m app.features.feature_pipeline historical_batch`           |
+| Task                                         | Command                                                                          |
+|----------------------------------------------|-----------------------------------------------------------------------------------|
+| Apply CI schema (active.* + history.*)       | `python scripts/schema/apply_init.py`                                             |
+| Apply feature pipeline schema (production.*) | `python scripts/schema/apply_feature_pipeline.py`                                 |
+| Load Morocco land polygon                    | `python scripts/ingest/load_osm_land.py`                                          |
+| Load Morocco coastline                       | `python scripts/ingest/load_osm_coastline.py`                                     |
+| Load properties from parquet                 | `python scripts/ingest/load_properties_from_parquet.py --parquet …`               |
+| Run weekly continuous flow                   | `python -m app.features.feature_pipeline weekly_continuous`                       |
+| Run historical batch flow                    | `python -m app.features.feature_pipeline historical_batch`                        |
