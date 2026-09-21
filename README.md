@@ -49,13 +49,17 @@ Both modes call **the same scoring code** (`backend/app/features/scores/service.
 
 ## Method
 
-Every score is built from POIs within a 1 km buffer and a 400 m walking radius:
+The amenity features follow the specification used by **Deng & Zhang (2025)** for property valuation in Hong Kong, re-implemented on OpenStreetMap data for Morocco:
 
-- **Density (30 %)** — POI count within 1 km, corrected by the land fraction of the buffer so coastal locations aren't penalised for having half their circle in the sea.
-- **Diversity (30 %)** — number of distinct super-categories and functional classes, plus Shannon entropy of the mix.
-- **Accessibility (40 %)** — share of 13 essential amenity types (pharmacy, school, bus stop, supermarket, …) reachable within 400 m.
+| Feature family (Deng & Zhang 2025) | Definition | This implementation |
+|---|---|---|
+| **POI density** | number of POIs within 1 km | `poi_count_1km`, corrected by the **land fraction** of the buffer so coastal locations aren't penalised for having half their circle in the sea (an addition — Hong Kong's study area didn't need it) |
+| **POI diversity** | number of POI types + Shannon entropy within 1 km | `n_categories`, `n_poi_types`, `entropy`, `entropy_fclass` (normalised variants included) |
+| **POI accessibility** | binary: is each of 13 key POI types within 400 m (5-min walk)? | `accessibility_400m` over 13 types adapted to Moroccan cities (pharmacy, school, bus stop, supermarket, bank, hospital, …) |
 
-Plus nearest-distance per category (up to 25 km) and distance to coastline. Full formulas: [docs/POI_SCORES.md](docs/POI_SCORES.md).
+These three families are combined into a single 0–100 **aggregate score** (30 % density · 30 % diversity · 40 % accessibility) for the dashboard; the individual features are what the ML pipeline stores. Also computed: nearest-distance per category (up to 25 km) and distance to coastline. Full formulas: [docs/POI_SCORES.md](docs/POI_SCORES.md).
+
+> Deng & Zhang list *"discrepancies of data temporal consistency … such as the update of POI places during the study period"* as a limitation of their study. The SCD2 history table below is this project's answer to it.
 
 <details>
 <summary>Screenshot — nearest POI per category, coastal proximity and the land-fraction buffer</summary>
@@ -124,9 +128,13 @@ Also: [CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md)
 ## Limitations and next steps
 
 - **POI cleaning & preprocessing pipeline** (OSM extract → clean → dedup → taxonomy → SCD2 load) is upcoming; until it lands, the POI tables are loaded from the dump.
-- Score weights (30/30/40) are hand-set from domain judgement, not learned; a natural next step is to validate them against transaction prices.
-- POI coverage depends on OpenStreetMap completeness, which varies across Moroccan cities.
+- Score weights (30/30/40) are hand-set from domain judgement, not learned; the natural next step is the one Deng & Zhang take — feed the individual features to an ensemble valuation model and let feature importance / SHAP tell us what matters in Morocco.
+- POI coverage depends on OpenStreetMap completeness, which varies across Moroccan cities (Deng & Zhang used a curated government POI database; OSM is noisier, hence the upcoming cleaning pipeline).
 - Property sync from the source transactions table and Alembic migrations are still manual.
+
+## Reference
+
+Deng, L., & Zhang, X. (2025). *Boosting the accuracy of property valuation with ensemble learning and explainable artificial intelligence: The case of Hong Kong.* The Annals of Regional Science, 74, 32. https://doi.org/10.1007/s00168-025-01365-7 (open access)
 
 ## Environment variables
 

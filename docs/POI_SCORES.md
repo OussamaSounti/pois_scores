@@ -2,6 +2,8 @@
 
 This document outlines all the Points of Interest (POI) scores calculated by the system and details the exact mathematical logic used to derive them.
 
+**Research basis.** The three feature families — density (count within 1 km), diversity (number of types + Shannon entropy within 1 km) and accessibility (binary presence of key POI types within 400 m, a 5-minute walk) — follow the spatial variables defined in Deng & Zhang (2025), *Boosting the accuracy of property valuation with ensemble learning and explainable artificial intelligence: The case of Hong Kong*, Annals of Regional Science 74:32, https://doi.org/10.1007/s00168-025-01365-7. Two adaptations for Morocco/OpenStreetMap: the 13 accessibility types are chosen for Moroccan cities, and density is corrected by the land fraction of the 1 km buffer for coastal locations. The 0–100 aggregate score and its weights are this project's addition for the dashboard; the ML pipeline stores the underlying features.
+
 ## Base Metrics
 
 Before calculating the aggregate score, the system computes several fundamental metrics within two radii (1km and 400m) around the target location:
