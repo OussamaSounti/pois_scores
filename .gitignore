@@ -70,4 +70,16 @@ data/*.sql
 *.log
 tmp/
 temp/
+
+# Data dumps (large); docs/POI_EXPORT.md describes the format
 /data/
+
+# Raw transaction inputs (parquet chunks, guides) — never versioned
+/input/
+
+# One-off scripts and local analysis scratch
+/scripts/oneoff/
+/01_evidence/
+
+# Editor artifacts
+.ipynb_checkpoints/
