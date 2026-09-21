@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Circle, GeoJSON, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { FeatureCollection } from 'geojson';
+import { API_BASE } from '../api';
 import type { PoiItem } from '../api';
 import { CAT_COLORS } from '../constants';
 
@@ -126,7 +127,7 @@ export default function MapView({
 
   useEffect(() => {
     if (showCoastline && !coastlineGeo) {
-      fetch('/api/v1/geo/coastline')
+      fetch(`${API_BASE}/api/v1/geo/coastline`)
         .then((r) => r.json())
         .then(setCoastlineGeo)
         .catch(console.error);

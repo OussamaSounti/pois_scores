@@ -1,5 +1,5 @@
 /** Backend API base. In dev we use relative /api so Vite proxy forwards to backend. */
-const API_BASE =
+export const API_BASE =
   typeof import.meta.env?.VITE_API_URL === 'string' &&
   import.meta.env.VITE_API_URL.trim().length > 0
     ? import.meta.env.VITE_API_URL.replace(/\/$/, '')
