@@ -2,8 +2,10 @@
 
 Usage:
 
-    python -m app.features.feature_pipeline weekly_continuous [--chunk-size N] [--workers N] [--skip-errors]
-    python -m app.features.feature_pipeline historical_batch  [--chunk-size N] [--workers N] [--skip-errors]
+    python -m app.features.feature_pipeline weekly_continuous [OPTIONS]
+    python -m app.features.feature_pipeline historical_batch  [OPTIONS]
+
+    OPTIONS: [--chunk-size N] [--workers N] [--skip-errors]
 
 The flow name is the first positional argument; everything else is parsed as
 flow-specific options.

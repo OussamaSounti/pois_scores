@@ -28,12 +28,8 @@ from app.core.constants import ACCESSIBILITY_KEY_TYPES, N_FCLASS_TYPES, N_SUPER_
 from app.core.spatial import _dist_coast_km, _entropy, land_fraction_at_point
 from app.features.pois.service import (
     PoiRow,
-    _nearest_km_by_category,
-    _nearest_km_by_category_at_date,
     query_pois_combined,
     query_pois_combined_at_date,
-    query_pois_radius,
-    query_pois_radius_at_date,
 )
 
 
@@ -118,9 +114,7 @@ def compute_scores_at_date(
     Uses a combined CTE query (1 round-trip for POIs + nearest) plus
     1 round-trip for coastal features = 2 total instead of 5.
     """
-    pois_1km, pois_400m, nearest_km = query_pois_combined_at_date(
-        session, lat, lon, as_of
-    )
+    pois_1km, pois_400m, nearest_km = query_pois_combined_at_date(session, lat, lon, as_of)
     dist_coast = _dist_coast_km(session, lat, lon)
     land_frac = land_fraction_at_point(session, lat, lon, dist_coast)
     payload = _aggregate_components(pois_1km, pois_400m, nearest_km, land_frac)

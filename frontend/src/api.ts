@@ -41,7 +41,6 @@ export type PoiItem = {
   distance_km: number;
 };
 
-
 export async function fetchPois(
   lat: number,
   lon: number,
@@ -60,7 +59,12 @@ export async function fetchPois(
   const pois = data.pois ?? [];
   // Accept both the current wire contract (osm_id/lat/lon) and the older
   // one (id/latitude/longitude) so a stale backend cannot blank the map.
-  return pois.map((p: any) => ({
+  type WirePoi = Partial<PoiItem> & {
+    osm_id?: number | string;
+    lat?: number;
+    lon?: number;
+  };
+  return pois.map((p: WirePoi) => ({
     ...p,
     id: String(p.osm_id ?? p.id),
     latitude: p.lat ?? p.latitude,
@@ -68,11 +72,7 @@ export async function fetchPois(
   }));
 }
 
-export async function fetchScore(
-  lat: number,
-  lon: number,
-  asOf?: string
-): Promise<ScoreResponse> {
+export async function fetchScore(lat: number, lon: number, asOf?: string): Promise<ScoreResponse> {
   const params = new URLSearchParams({
     lat: String(lat),
     lon: String(lon),
@@ -95,4 +95,3 @@ export async function fetchBatch(
   const data = await res.json();
   return data.results ?? [];
 }
-

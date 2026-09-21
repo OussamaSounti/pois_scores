@@ -84,9 +84,7 @@ class PropertyFeaturesRepository:
                     AND f.land_buffer_fraction_1km IS NOT NULL
               )
         """)
-        return int(
-            self._session.execute(sql, {"poi_source": POI_SOURCE_HISTORY}).scalar() or 0
-        )
+        return int(self._session.execute(sql, {"poi_source": POI_SOURCE_HISTORY}).scalar() or 0)
 
     def fetch_pending_historical(
         self,

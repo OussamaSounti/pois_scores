@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.core.spatial import _as_of_ts
 from app.core.tables import (
-    T_POIS_CURRENT,
     T_POI_HISTORY,
+    T_POIS_CURRENT,
     poi_history_scd2_where,
     poi_lat_expr,
     poi_lon_expr,
@@ -83,9 +83,7 @@ class PoiRepository:
                 :radius_m
             )
         """)
-        rows = self._session.execute(
-            sql, {"lat": lat, "lon": lon, "radius_m": radius_m}
-        ).fetchall()
+        rows = self._session.execute(sql, {"lat": lat, "lon": lon, "radius_m": radius_m}).fetchall()
         return [_row_to_poi(r) for r in rows]
 
     def query_with_distance(
@@ -111,9 +109,7 @@ class PoiRepository:
             )
             ORDER BY dist_km
         """)
-        rows = self._session.execute(
-            sql, {"lat": lat, "lon": lon, "radius_m": radius_m}
-        ).fetchall()
+        rows = self._session.execute(sql, {"lat": lat, "lon": lon, "radius_m": radius_m}).fetchall()
         return [
             {
                 "osm_id": r.osm_id,
@@ -292,9 +288,7 @@ class PoiRepository:
             FROM pois
             ORDER BY dist_m
         """)
-        rows = self._session.execute(
-            sql, {"lat": lat, "lon": lon, "as_of": ts}
-        ).fetchall()
+        rows = self._session.execute(sql, {"lat": lat, "lon": lon, "as_of": ts}).fetchall()
 
         pois_1km: list[PoiRow] = []
         pois_400m: list[PoiRow] = []

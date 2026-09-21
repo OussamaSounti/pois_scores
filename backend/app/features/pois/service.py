@@ -85,9 +85,7 @@ def _nearest_km_by_category_at_date(
     as_of: date | datetime,
     max_radius_m: float = 25_000,
 ) -> dict[str, float]:
-    return PoiRepository(session).nearest_km_by_category_at_date(
-        lat, lon, as_of, max_radius_m
-    )
+    return PoiRepository(session).nearest_km_by_category_at_date(lat, lon, as_of, max_radius_m)
 
 
 def query_pois_combined(

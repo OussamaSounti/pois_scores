@@ -112,7 +112,8 @@ def weekly_recompute_flow(chunk_size: int = CHUNK_SIZE) -> dict[str, str | int]:
 
         if pending_after != 0:
             raise RuntimeError(
-                f"Pipeline finished with {pending_after} pending properties for refresh {external_ts}"
+                f"Pipeline finished with {pending_after} pending properties "
+                f"for refresh {external_ts}"
             )
 
         logger.info("Pipeline success: processed_rows=%d", processed_rows)

@@ -14,7 +14,13 @@ type Props = {
   asOfDate?: string;
 };
 
-export default function MetricsPanel({ data, activeFilter, onItemClick, onClearFilter, asOfDate }: Props) {
+export default function MetricsPanel({
+  data,
+  activeFilter,
+  onItemClick,
+  onClearFilter,
+  asOfDate,
+}: Props) {
   if (!data) {
     return (
       <div className="metrics-panel">
@@ -36,27 +42,34 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
 
   // ── Coastal proximity helpers ──────────────────────────────────
   const distCoast = s.dist_coast_km;
-  const landFrac  = s.land_buffer_fraction_1km ?? 1.0;
+  const landFrac = s.land_buffer_fraction_1km ?? 1.0;
   const oceanFrac = 1.0 - landFrac;
   // Show the card only when there is real coastal information:
   // either we have a measured coastline distance, OR the buffer is partially in the ocean.
   const showCoastal = distCoast != null || (s.land_buffer_fraction_1km != null && landFrac < 0.999);
   // Donut ring geometry
-  const R = 26, CX = 34, CY = 34;
+  const R = 26,
+    CX = 34,
+    CY = 34;
   const circ = 2 * Math.PI * R;
   // Proximity category
   const coastBadge =
-    distCoast == null       ? null
-    : distCoast < 0.2      ? { label: 'Beachfront', cls: 'beachfront' }
-    : distCoast < 0.5      ? { label: 'Seafront',   cls: 'seafront'   }
-    : distCoast < 1.0      ? { label: 'Near Sea',   cls: 'near-sea'   }
-    :                        { label: 'Coastal',    cls: 'coastal'    };
+    distCoast == null
+      ? null
+      : distCoast < 0.2
+        ? { label: 'Beachfront', cls: 'beachfront' }
+        : distCoast < 0.5
+          ? { label: 'Seafront', cls: 'seafront' }
+          : distCoast < 1.0
+            ? { label: 'Near Sea', cls: 'near-sea' }
+            : { label: 'Coastal', cls: 'coastal' };
   // Human-friendly distance display (m when < 1 km)
-  const distDisplay = distCoast != null
-    ? (distCoast < 1
+  const distDisplay =
+    distCoast != null
+      ? distCoast < 1
         ? { val: Math.round(distCoast * 1000).toString(), unit: 'm' }
-        : { val: distCoast.toFixed(2), unit: 'km' })
-    : null;
+        : { val: distCoast.toFixed(2), unit: 'km' }
+      : null;
 
   const filterLabel =
     activeFilter?.section === 'accessibility'
@@ -66,7 +79,9 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
   return (
     <div className="metrics-panel">
       {/* POI data source banner — shown whenever a result is available */}
-      <div className={`poi-source-banner ${isHistorical ? 'poi-source-history' : 'poi-source-current'}`}>
+      <div
+        className={`poi-source-banner ${isHistorical ? 'poi-source-history' : 'poi-source-current'}`}
+      >
         {isHistorical
           ? `Historical POIs${asOfDate ? ` · ${asOfDate}` : ''}`
           : 'Current POI snapshot'}
@@ -126,16 +141,24 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
               Diversity (category)
               <Tooltip text={SCORE_TOOLTIPS.entropy} />
             </div>
-            <div className="kpi-value small">{s.entropy_norm != null ? `${(s.entropy_norm * 100).toFixed(0)}%` : '—'}</div>
-            <div className="kpi-sub">{s.n_categories}/11 cats · {s.entropy.toFixed(2)} bits</div>
+            <div className="kpi-value small">
+              {s.entropy_norm != null ? `${(s.entropy_norm * 100).toFixed(0)}%` : '—'}
+            </div>
+            <div className="kpi-sub">
+              {s.n_categories}/11 cats · {s.entropy.toFixed(2)} bits
+            </div>
           </div>
           <div className="kpi-card">
             <div className="kpi-label">
               Diversity (type)
               <Tooltip text={SCORE_TOOLTIPS.entropy_fclass} />
             </div>
-            <div className="kpi-value small">{s.entropy_fclass_norm != null ? `${(s.entropy_fclass_norm * 100).toFixed(0)}%` : '—'}</div>
-            <div className="kpi-sub">{s.n_poi_types}/91 types · {s.entropy_fclass.toFixed(2)} bits</div>
+            <div className="kpi-value small">
+              {s.entropy_fclass_norm != null ? `${(s.entropy_fclass_norm * 100).toFixed(0)}%` : '—'}
+            </div>
+            <div className="kpi-sub">
+              {s.n_poi_types}/91 types · {s.entropy_fclass.toFixed(2)} bits
+            </div>
           </div>
           {s.aggregate_score != null && (
             <div className="kpi-card">
@@ -188,7 +211,11 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
           role={onItemClick ? 'button' : undefined}
           tabIndex={onItemClick ? 0 : undefined}
           onClick={onItemClick ? () => onItemClick('accessibility', '__all__') : undefined}
-          onKeyDown={onItemClick ? (e) => e.key === 'Enter' && onItemClick('accessibility', '__all__') : undefined}
+          onKeyDown={
+            onItemClick
+              ? (e) => e.key === 'Enter' && onItemClick('accessibility', '__all__')
+              : undefined
+          }
           title={onItemClick ? 'Click to show all POIs within 400 m' : undefined}
         >
           Accessibility · 400 m walk
@@ -266,7 +293,9 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
                 {/* ocean arc */}
                 {oceanFrac > 0.001 && (
                   <circle
-                    cx={CX} cy={CY} r={R}
+                    cx={CX}
+                    cy={CY}
+                    r={R}
                     fill="none"
                     stroke="#1a7fa8"
                     strokeWidth="8"
@@ -278,7 +307,9 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
                 )}
                 {/* land arc */}
                 <circle
-                  cx={CX} cy={CY} r={R}
+                  cx={CX}
+                  cy={CY}
+                  r={R}
                   fill="none"
                   stroke="#1e9d65"
                   strokeWidth="8"
@@ -289,7 +320,8 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
                 />
                 {/* centre label */}
                 <text
-                  x={CX} y={CY - 4}
+                  x={CX}
+                  y={CY - 4}
                   textAnchor="middle"
                   fill="#1e9d65"
                   fontSize="13"
@@ -299,7 +331,8 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
                   {(landFrac * 100).toFixed(0)}%
                 </text>
                 <text
-                  x={CX} y={CY + 9}
+                  x={CX}
+                  y={CY + 9}
                   textAnchor="middle"
                   fill="#8a93b2"
                   fontSize="7"
@@ -333,8 +366,8 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
               )}
               {landFrac < 0.999 && (
                 <div className="coastal-correction-note">
-                  <strong>{(oceanFrac * 100).toFixed(0)}%</strong> of the 1 km buffer
-                  extends into the ocean
+                  <strong>{(oceanFrac * 100).toFixed(0)}%</strong> of the 1 km buffer extends into
+                  the ocean
                 </div>
               )}
             </div>
@@ -348,18 +381,11 @@ export default function MetricsPanel({ data, activeFilter, onItemClick, onClearF
                 style={{ width: `${oceanFrac * 100}%` }}
                 title={`${(oceanFrac * 100).toFixed(0)}% ocean`}
               />
-              <div
-                className="coastal-bar-land"
-                title={`${(landFrac * 100).toFixed(0)}% land`}
-              />
+              <div className="coastal-bar-land" title={`${(landFrac * 100).toFixed(0)}% land`} />
             </div>
             <div className="coastal-split-labels">
-              <span className="coastal-lbl-ocean">
-                🌊 {(oceanFrac * 100).toFixed(0)}% ocean
-              </span>
-              <span className="coastal-lbl-land">
-                🏡 {(landFrac * 100).toFixed(0)}% land
-              </span>
+              <span className="coastal-lbl-ocean">🌊 {(oceanFrac * 100).toFixed(0)}% ocean</span>
+              <span className="coastal-lbl-land">🏡 {(landFrac * 100).toFixed(0)}% land</span>
             </div>
           </div>
         </div>

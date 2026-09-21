@@ -115,4 +115,9 @@ RUN_STATUS_SKIPPED: str = "skipped"
 TRIGGERED_BY_CLI: str = "cli"
 TRIGGERED_BY_PREFECT: str = "prefect"
 
-HIERARCHY_UID_FIELDS: tuple[str, ...] = ("district_uid", "neighbourhood_uid", "iris_uid", "ilot_uid")
+HIERARCHY_UID_FIELDS: tuple[str, ...] = (
+    "district_uid",
+    "neighbourhood_uid",
+    "iris_uid",
+    "ilot_uid",
+)

@@ -10,7 +10,8 @@ const MOROCCO_CENTER: [number, number] = [31.7917, -7.0926];
 const MOROCCO_ZOOM = 6;
 const LOCATION_ZOOM = 15;
 const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+const TILE_ATTR =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 /** Re-centres only when the coordinates actually change (not on every parent render). */
 function SetView({ center, zoom }: { center: [number, number]; zoom: number }) {

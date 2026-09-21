@@ -138,4 +138,3 @@ class GeoReferenceRepository:
 
     def get_coastline_feature_collection(self) -> dict[str, Any]:
         return self.table_to_feature_collection(T_GEO_COASTLINE)
-

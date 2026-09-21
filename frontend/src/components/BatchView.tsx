@@ -771,8 +771,14 @@ export default function BatchView({ onRowClick }: BatchViewProps) {
                     <td>{r.scores.poi_count_400m}</td>
                     <td>{r.scores.n_categories}</td>
                     <td>{r.scores.aggregate_score != null ? r.scores.aggregate_score : '—'}</td>
-                    <td>{r.scores.dist_coast_km != null ? r.scores.dist_coast_km.toFixed(3) : '—'}</td>
-                    <td>{r.scores.land_buffer_fraction_1km != null ? (r.scores.land_buffer_fraction_1km * 100).toFixed(1) + '%' : '—'}</td>
+                    <td>
+                      {r.scores.dist_coast_km != null ? r.scores.dist_coast_km.toFixed(3) : '—'}
+                    </td>
+                    <td>
+                      {r.scores.land_buffer_fraction_1km != null
+                        ? (r.scores.land_buffer_fraction_1km * 100).toFixed(1) + '%'
+                        : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -68,13 +68,9 @@ class PipelineRunTracker:
                 logger.exception("Failed to create pipeline run tracking tables")
         self._enabled = self._repo.table_exists()
         if self._enabled and not existed:
-            logger.info(
-                "Created pipeline run tracking tables in production schema"
-            )
+            logger.info("Created pipeline run tracking tables in production schema")
         elif not self._enabled:
-            logger.warning(
-                "production.feature_pipeline_runs is unavailable; run tracking disabled"
-            )
+            logger.warning("production.feature_pipeline_runs is unavailable; run tracking disabled")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
