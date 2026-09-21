@@ -307,8 +307,8 @@ body {
 .map-wrap { flex: 1; min-height: 0; position: relative; overflow: hidden; display: flex; flex-direction: column; }
 .map-wrap .map-inner { flex: 1; min-height: 0; position: relative; }
 .map-wrap .leaflet-container { width: 100% !important; height: 100% !important; min-height: 300px; }
-/* Mute the OSM basemap so POI markers stand out; overlays/markers are unaffected. */
-.map-wrap .leaflet-tile-pane { filter: grayscale(0.85) brightness(1.06) contrast(0.92); }
+/* Soften the OSM basemap (muted colour, not greyscale) so POI markers stay dominant. */
+.map-wrap .leaflet-tile-pane { filter: saturate(0.55) brightness(1.05) contrast(0.95); }
 
 /* Geo overlay toggle buttons */
 .geo-overlay-btns { position: absolute; top: 10px; right: 54px; z-index: 1000; display: flex; gap: 8px; }
