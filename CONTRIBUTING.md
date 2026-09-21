@@ -1,58 +1,94 @@
-# Contributing to Morocco Spatial Dashboard
+# Contributing
 
-## Standards
+How to contribute code and docs to the Morocco Spatial Dashboard.
 
-All code and docs must follow the project’s [Engineering standards](docs/ENGINEERING_STANDARDS.md): tech stack and versions, naming, typing, testing, and CI/CD gates. Read that doc before contributing.
+---
 
-## Branching
+## Workflow
 
-Work on feature branches from `main`. Do not commit directly to `main`. Create a branch for your change (e.g. `feature/your-feature` or `fix/your-fix`).
+1. Branch from `main` (e.g. `feature/my-change`, `fix/bug`, `docs/update`).
+2. Open a Merge Request — describe the change; CI must pass.
+3. Merge after review (if your team uses it).
 
-## Merge requests
+**Release:** tag from `main` (`v0.1.0`) — see [GUIDE.md](docs/GUIDE.md#part-4--release-and-rollback).
 
-Open a Merge Request (MR) to `main`. Describe the change clearly and ensure CI passes (lint, test, build). Request review if your team uses it.
+---
 
-## Code quality
-
-Before pushing, ensure [Engineering standards](docs/ENGINEERING_STANDARDS.md) are met:
-
-1. **Tests:** From the project root or `backend/`:
-   ```bash
-   cd backend && pytest tests/ -v
-   ```
-   Integration tests require Postgres with the schema (see [README](README.md) and [docs/RUNBOOK.md](docs/RUNBOOK.md)). For frontend: `cd frontend && npm run test`.
-
-2. **Lint and format:** CI runs Ruff (backend) and ESLint/Prettier (frontend). Run locally to avoid failures:
-   ```bash
-   ruff check backend/
-   ruff format backend/
-   cd frontend && npm run lint && npm run format:check
-   ```
-   See [.gitlab-ci.yml](.gitlab-ci.yml) for the exact commands.
-
-## Pre-commit
-
-Install [pre-commit](https://pre-commit.com/) and run hooks before each commit:
+## Before pushing
 
 ```bash
-pip install pre-commit
-pre-commit install
+ruff check backend/ && ruff format --check backend/
+cd backend && pytest tests/ -v --cov=app --cov-fail-under=70
+cd frontend && npm run lint && npm run format:check && npm run test && npm run build
+pre-commit run --all-files   # optional but recommended
 ```
 
-To run on all files once: `pre-commit run --all-files`. Pre-commit runs the same checks as CI (backend Ruff, frontend lint/format, hygiene). Node must be installed for frontend hooks.
+Integration tests need Postgres + schema — see [GUIDE.md](docs/GUIDE.md).
+
+---
+
+## Tech stack
+
+| Component | Version |
+|-----------|---------|
+| Python | 3.12+ |
+| Node | 18+ (CI uses 20) |
+| PostgreSQL | 16+ with PostGIS |
+| Backend | FastAPI, Pydantic v2, SQLAlchemy 2 |
+| Frontend | React 18, Vite, TypeScript |
+
+Deps: [backend/REQUIREMENTS.md](backend/REQUIREMENTS.md).
+
+---
+
+## Coding standards
+
+- **Python:** Ruff lint + format; type hints on public functions; docstrings on public APIs.
+- **TypeScript:** `strict: true`; no `any` on API surfaces; types in `frontend/src/api.ts`.
+- **Pydantic v2:** `extra="forbid"` on requests; `Field(...)` for descriptions.
+- **Architecture:** Frontend → API only. All SQL in `repositories/`. Table names in `core/tables.py`.
+- **Naming:** snake_case (Python, DB, API JSON); PascalCase (React components); `/api/v1/…` routes.
+- **Commits:** conventional — `feat:`, `fix:`, `docs:`.
+
+**Batch API:** optional `id` per location is client-side correlation only; results match input order.
+
+---
+
+## Testing
+
+- Backend: unit tests (no DB) + integration tests (Postgres). **70% coverage floor** in CI.
+- Frontend: Vitest on API utils and app smoke tests.
+
+---
 
 ## Documentation
 
-- **[docs/README.md](docs/README.md)** — Documentation hub (start here)
-- [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) — First-run tutorial
-- [README.md](README.md) — Project overview
-- [PROJECT_SPEC.md](PROJECT_SPEC.md) — Product specification (as implemented)
-- [docs/RUNBOOK.md](docs/RUNBOOK.md) — Operations
-- [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — Schema reference
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System design
+| Doc | When to update |
+|-----|----------------|
+| [PLATFORM_REFERENCE.md](docs/PLATFORM_REFERENCE.md) | Pipeline logic, API, architecture detail |
+| [GUIDE.md](docs/GUIDE.md) | Commands, setup, ops, deploy |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | High-level system design |
+| [DATA_MODEL.md](docs/DATA_MODEL.md) | Schema / table changes |
+| [POI_EXPORT.md](docs/POI_EXPORT.md) | POI dump format changes |
 
-## GitLab and operations
+Also update [scripts/README.md](scripts/README.md) for new CLI scripts.  
+Pipeline internals: [feature_pipeline README](backend/app/features/feature_pipeline/README.md).
 
-- **Wiki:** Use the project Wiki (GitLab: Project → Wiki) for extra runbooks or living docs if you prefer not to keep everything in `docs/`.
-- **Integrations:** Configure in GitLab **Settings → Integrations** (e.g. Slack on pipeline failure, Jira link).
-- **Kubernetes:** If you deploy to Kubernetes, add a cluster in **Settings → Kubernetes**. Deployment manifests can live in this repo or a separate one when you adopt K8s.
+Avoid stale names: `production.pois_current`, `osm_history.*`, `backend/scripts/` — use `active.production_pois_current`, `scripts/ingest/`.
+
+---
+
+## Security
+
+- No secrets in repo — `.env` is gitignored.
+- CORS: explicit allowlist only (no `*` in production).
+
+---
+
+## Pre-commit
+
+```bash
+pip install pre-commit && pre-commit install
+```
+
+Runs the same checks as CI (Ruff, ESLint, Prettier).

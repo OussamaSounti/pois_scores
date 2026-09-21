@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- **Documentation overhaul:** Added [docs/README.md](docs/README.md) hub, [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md), and module READMEs (`backend/`, `frontend/`, `backend/app/`). Rewrote [DATA_MODEL.md](docs/DATA_MODEL.md), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [RUNBOOK.md](docs/RUNBOOK.md), [PROJECT_SPEC.md](PROJECT_SPEC.md), and [PRODUCTION_POIS_PLATFORM.md](docs/PRODUCTION_POIS_PLATFORM.md) to match current code.
+- **Documentation consolidation:** Reduced to 4 central docs — [GUIDE.md](docs/GUIDE.md) (setup + ops + deploy), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [DATA_MODEL.md](docs/DATA_MODEL.md), [POI_EXPORT.md](docs/POI_EXPORT.md). Merged engineering standards into [CONTRIBUTING.md](CONTRIBUTING.md). Removed 15+ redundant markdown files.
 - **Schema naming in docs:** POI tables documented as `active.production_pois_current` and `history.production_poi_history`; audit table as `active.audit_pipeline_runs` (replaces stale `production.pois_current`, `osm_history.*`, `audit.pipeline_runs`).
 - **Script paths in docs:** All references updated to `scripts/ingest/` and `scripts/schema/` (replaces `backend/scripts/` and root-level loader paths).
 - **Docker pipeline:** Documented `docker compose --profile pipeline run --rm pipeline` consistently.

@@ -1,7 +1,6 @@
 # Architecture — Morocco Spatial Dashboard
 
-**What:** How the dashboard, API, pipeline, and database fit together.  
-**Why:** Understand data ownership, scoring modes, and where logic lives before changing code.
+How the dashboard, API, pipeline, and database fit together.
 
 ---
 
@@ -15,7 +14,7 @@ flowchart TB
   end
 
   subgraph backend [Backend FastAPI :8000]
-    Routers[routers scores pois properties geo]
+    Routers[routers scores pois geo]
     Services[services]
     Repos[repositories SQL]
   end
@@ -33,128 +32,64 @@ flowchart TB
     GeoT[geo.land / geo.coastline]
   end
 
-  subgraph external_poi [External POI pipeline]
-    POIRefresh[Monthly POI refresh]
+  subgraph poi_pipeline [POI cleaning & preprocessing pipeline — upcoming]
+    POIRefresh[Monthly OSM extract → clean → dedup → SCD2 load]
   end
 
   Browser --> Routers
   External --> Routers
-  Routers --> Services
-  Services --> Repos
-  Repos --> Active
-  Repos --> History
-  Repos --> Prod
-  Repos --> GeoT
-
+  Routers --> Services --> Repos
+  Repos --> Active & History & Prod & GeoT
   Weekly --> Services
   Hist --> Services
-  Prefect --> Weekly
-  Prefect --> Hist
-  Weekly --> Prod
-  Hist --> Prod
-
-  POIRefresh --> Active
-  POIRefresh --> History
+  Prefect --> Weekly & Hist
+  Weekly & Hist --> Prod
+  POIRefresh --> Active & History
 ```
 
-**Key points:**
-
-- Dashboard and external clients use the **same REST API**.
-- Backend is the **only** component that talks to the database from the app side.
-- POI data in `active.*` / `history.*` is **owned by an external pipeline** — this repo reads it.
-- `production.*` and `geo.*` tables are **owned by this app** (schema in `scripts/schema/`).
+- POI data (`active.*`, `history.*`) is produced by the **POI cleaning & preprocessing pipeline** (OSM extract → cleaning → deduplication → taxonomy mapping → SCD2 history). That pipeline is **upcoming** in this repo; today the scoring stack consumes its output tables and a trimmed dump ([POI_EXPORT.md](POI_EXPORT.md)) is used for local development.
+- `production.*` and `geo.*` are **owned by the scoring app**.
 
 ---
 
-## Backend layers
+## Backend code layout
 
 ```
-main.py          → wires routers + /health, /ready, /metrics
-features.*       → business logic (scores, pois, properties, geo, pipeline)
-repositories.*   → all SQL queries
-core.*           → config, DB session, tables.py, spatial math, metrics
+backend/app/
+  main.py           → routers + /health, /ready, /metrics
+  core/             → config, DB, tables.py, spatial math
+  repositories/     → all SQL (services never embed queries)
+  features/
+    scores/         → score math (API + pipeline)
+    pois/           → POI list queries
+    geo/            → GeoJSON overlays
+    feature_pipeline/  → batch scoring CLI + Prefect
 ```
 
-See [backend/app/README.md](../backend/app/README.md) and [backend/app/repositories/README.md](../backend/app/repositories/README.md).
+**Rule:** `core` never imports from `features`. Table names in `core/tables.py`.
 
-**Dependency rule:** `core` never imports from `features`. Table names come from `core/tables.py`.
+Pipeline details: [feature_pipeline README](../backend/app/features/feature_pipeline/README.md).
 
 ---
 
 ## Two scoring modes
 
-| Mode | Trigger | POI source | Output |
-|------|---------|------------|--------|
-| **Live API** | HTTP request to `/api/v1/scores` | `active.production_pois_current` (or history via `as_of`) | JSON in response |
-| **Batch pipeline** | CLI, Docker, or Prefect | Current snapshot or `history.production_poi_history` at `transaction_date` | Rows in `production.property_features` |
+| Mode | Trigger | Output |
+|------|---------|--------|
+| **Live API** | `/api/v1/scores` | JSON per request |
+| **Batch pipeline** | CLI / Docker / Prefect | `production.property_features` rows |
 
-Both use the same functions in `features/scores/service.py`. Details: [scores README](../backend/app/features/scores/README.md).
-
-The **Properties** tab reads **precomputed** features from `production.property_features` — it does not run live scoring per click.
-
----
-
-## Data flows
-
-### Single-location score (live)
-
-1. User enters coordinates or double-clicks the map.
-2. Frontend → `GET /api/v1/scores?lat=…&lon=…` (or POST with JSON body).
-3. `scores/service.py`: query POIs within 1 km and 400 m, compute density, diversity, accessibility, nearest, coastal signals.
-4. Response: `{ location, scores }`.
-5. Frontend → `GET /api/v1/pois?lat=…&lon=…&radius_km=1` for map markers and POI list.
-
-Optional `as_of` date uses `history.production_poi_history` with SCD2 filter (`is_canonical = true`).
-
-### Batch scores (live)
-
-1. User uploads CSV/JSON or pastes coordinates (max 500).
-2. Frontend → `POST /api/v1/scores/batch`.
-3. Backend runs the same score logic per location; returns ordered results.
-4. User exports CSV or clicks a row → Single tab.
-
-### Properties map (precomputed)
-
-1. Frontend → `GET /api/v1/properties` with bounding box and optional admin filters.
-2. Backend joins `production.properties` + `production.property_features`.
-3. Stats and detail endpoints support admin hierarchy drill-down.
-
-See [properties README](../backend/app/features/properties/README.md).
-
-### Feature pipeline (offline)
-
-1. **Weekly continuous:** detect new POI version via `max(active.audit_pipeline_runs.run_timestamp)`; score pending properties against current POIs.
-2. **Historical batch:** for properties with `transaction_date`, score at that date using SCD2 history.
-3. Write flattened columns to `production.property_features`; record run in `production.feature_pipeline_runs`.
-
-See [feature_pipeline README](../backend/app/features/feature_pipeline/README.md).
-
-### Local bootstrap (not production)
-
-```mermaid
-flowchart LR
-  Schema[scripts/schema] --> DB[(Postgres)]
-  Geo[scripts/ingest geo] --> DB
-  Parquet[scripts/ingest parquet] --> DB
-  Dump[data/poi_db_export.sql] --> DB
-  Pipeline[feature_pipeline] --> DB
-```
-
-Production skips dump restore — POI data arrives from the external pipeline.
+Both call `features/scores/service.py`, so the API and the pipeline can never drift apart.
 
 ---
 
 ## Frontend
 
-React SPA with three tabs ([frontend/README.md](../frontend/README.md)):
+React + Vite + Leaflet. Two tabs: **Single** (click the map, see scores + nearby POIs) and **Batch** (upload CSV/JSON, score up to 500 rows, export).
 
-| Tab | Purpose |
-|-----|---------|
-| Single | Live score + map + POI panel |
-| Batch | Live batch scores + export |
-| Properties | Precomputed property features on map |
-
-Dev proxy in Vite forwards `/api` to `localhost:8000`.
+- Dev: Vite proxies `/api` → `localhost:8000`
+- Override API: `VITE_API_URL` in `frontend/.env`
+- API client: `frontend/src/api.ts`
 
 ---
 
@@ -162,17 +97,11 @@ Dev proxy in Vite forwards `/api` to `localhost:8000`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/health` | Liveness |
-| GET | `/ready` | DB connectivity (503 if down) |
-| GET | `/metrics` | Prometheus metrics |
+| GET | `/health`, `/ready`, `/metrics` | Liveness, readiness, Prometheus |
 | GET/POST | `/api/v1/scores` | Single-location score |
-| POST | `/api/v1/scores/batch` | Batch scores (max 500) |
+| POST | `/api/v1/scores/batch` | Batch (max 500) |
 | GET | `/api/v1/pois` | POIs within radius |
-| GET | `/api/v1/properties` | Property markers in bbox |
-| GET | `/api/v1/properties/stats` | Grouped stats by admin level |
-| GET | `/api/v1/properties/{id}` | Property detail + features |
-| GET | `/api/v1/geo/land` | Land polygon GeoJSON |
-| GET | `/api/v1/geo/coastline` | Coastline GeoJSON |
+| GET | `/api/v1/geo/land`, `/geo/coastline` | GeoJSON overlays |
 
 OpenAPI: http://localhost:8000/docs
 
@@ -182,12 +111,40 @@ OpenAPI: http://localhost:8000/docs
 
 | Schema | Owner | Key tables |
 |--------|-------|------------|
-| `active` | External POI pipeline | `production_pois_current`, `audit_pipeline_runs` |
-| `history` | External POI pipeline | `production_poi_history` (SCD2) |
-| `production` | This app | `properties`, `property_features`, `feature_pipeline_runs` |
-| `geo` | This app (local bootstrap) | `land`, `coastline` |
+| `active` | POI cleaning & preprocessing pipeline (upcoming) | `production_pois_current`, `audit_pipeline_runs` |
+| `history` | POI cleaning & preprocessing pipeline (upcoming) | `production_poi_history` (SCD2) |
+| `production` | Scoring app | `properties`, `property_features`, `feature_pipeline_runs` |
+| `geo` | Scoring app | `land`, `coastline` |
 
-Full reference: [DATA_MODEL.md](DATA_MODEL.md).
+Full columns: [DATA_MODEL.md](DATA_MODEL.md). POI dump: [POI_EXPORT.md](POI_EXPORT.md).
+
+---
+
+## Production context
+
+Single Postgres instance (AWS RDS). The POI cleaning & preprocessing pipeline refreshes `active.*` / `history.*` monthly and records each run in `active.audit_pipeline_runs`.
+
+After each POI refresh:
+
+1. Verify new row in `active.audit_pipeline_runs`
+2. Run `weekly_continuous` pipeline
+3. ML reads `production.property_features` filtered by `poi_refreshed_at`
+
+**Upcoming:** the full POI cleaning & preprocessing pipeline (OSM extract, cleaning, deduplication, taxonomy mapping, SCD2 loading) will be added to this repo. **Remaining gaps:** automated property sync from transactions table, Alembic migrations, ECS deploy automation, auth, Grafana dashboards.
+
+Operations: [GUIDE.md](GUIDE.md).
+
+---
+
+## Observability
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /health` | Liveness — process up |
+| `GET /ready` | Readiness — DB reachable (503 if not) |
+| `GET /metrics` | Prometheus scrape target |
+
+Set `LOG_LEVEL=info` in production. Configure load balancer probes on `/ready` and `/health`.
 
 ---
 
@@ -198,20 +155,31 @@ Full reference: [DATA_MODEL.md](DATA_MODEL.md).
 | `DATABASE_URL` | API, pipeline, scripts |
 | `CORS_ORIGINS` | API |
 | `LOG_LEVEL` | API, pipeline |
-| `PIPELINE_VERSION` | Pipeline → `property_features` |
-| `VITE_API_URL` | Frontend (optional override) |
+| `PIPELINE_VERSION` | Pipeline |
+| `VITE_API_URL` | Frontend build |
 
-**Production:** set `DATABASE_URL` to the managed Postgres instance. No code changes.
-
-**Local/dev:** Docker Compose Postgres + optional dump. See [GETTING_STARTED.md](GETTING_STARTED.md).
+Production = set `DATABASE_URL` only. Local setup: [GUIDE.md](GUIDE.md).
 
 ---
 
-## Further reading
+## Product summary
+
+| Capability | Status |
+|------------|--------|
+| Live + batch scoring API | Done |
+| Properties map (precomputed) | Done |
+| Weekly + historical pipeline | Done |
+| Prefect orchestration | Done |
+| GitLab CI (lint, test 70%, build) | Done |
+| Internal auth | Not in v1 |
+
+---
+
+## See also
 
 | Doc | Topic |
 |-----|-------|
-| [DATA_MODEL.md](DATA_MODEL.md) | Tables and columns |
-| [RUNBOOK.md](RUNBOOK.md) | Operations |
-| [PRODUCTION_POIS_PLATFORM.md](PRODUCTION_POIS_PLATFORM.md) | Production context |
-| [PROJECT_SPEC.md](../PROJECT_SPEC.md) | Product requirements |
+| [PLATFORM_REFERENCE.md](PLATFORM_REFERENCE.md) | Full detail: pipeline steps, API, DB, Prefect, repo status |
+| [GUIDE.md](GUIDE.md) | Setup, ops, deploy |
+| [DATA_MODEL.md](DATA_MODEL.md) | Schema reference |
+| [CONTRIBUTING.md](../CONTRIBUTING.md) | Standards and CI |

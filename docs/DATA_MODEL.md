@@ -1,10 +1,10 @@
 # Data model
 
 **What:** PostgreSQL schemas and tables used by the API and feature pipeline.  
-**Why:** The backend reads these tables only — it does not create or alter the external POI schema. Use this document to look up correct schema, table, and column names.
+**Why:** The scoring backend only reads the POI tables — they are produced by the POI cleaning & preprocessing pipeline (upcoming in this repo). Use this document to look up correct schema, table, and column names.
 
 **Source of truth in code:** [`backend/app/core/tables.py`](../backend/app/core/tables.py)  
-**POI export details:** [`data/README.md`](../data/README.md) (taxonomy, dump format)  
+**POI export details:** [POI_EXPORT.md](POI_EXPORT.md) (taxonomy, dump format)  
 **Schema SQL:** [`scripts/schema/`](../scripts/schema/)
 
 ---
@@ -13,14 +13,14 @@
 
 | Schema | Owner | Purpose |
 |--------|-------|---------|
-| `active` | External POI pipeline | Current POI snapshot, audit, taxonomy |
-| `history` | External POI pipeline | SCD2 versioned POI timeline |
-| `production` | This app | Properties, precomputed features, pipeline run ledger |
-| `geo` | This app (local bootstrap) | Coastline and land reference polygons |
+| `active` | POI cleaning & preprocessing pipeline (upcoming) | Current POI snapshot, audit, taxonomy |
+| `history` | POI cleaning & preprocessing pipeline (upcoming) | SCD2 versioned POI timeline |
+| `production` | Scoring app | Properties, precomputed features, pipeline run ledger |
+| `geo` | Scoring app (local bootstrap) | Coastline and land reference polygons |
 
 ```mermaid
 flowchart LR
-  subgraph external [External POI pipeline]
+  subgraph poi_pipeline [POI cleaning & preprocessing pipeline — upcoming]
     POI[active.production_pois_current]
     HIST[history.production_poi_history]
     AUDIT[active.audit_pipeline_runs]
@@ -47,7 +47,7 @@ flowchart LR
 
 ---
 
-## POI tables (external — read only)
+## POI tables (output of the POI cleaning & preprocessing pipeline — read only for the scoring app)
 
 ### `active.production_pois_current`
 
@@ -71,24 +71,35 @@ Use `lat` / `lon` for simple distance logic; use `geom` with PostGIS (`ST_DWithi
 
 ### `history.production_poi_history`
 
-**What the pipeline uses for temporal scoring** at a property's `transaction_date`. SCD2 versioned timeline.
+**What the pipeline uses for temporal scoring** at a property's `transaction_date`. SCD2 versioned timeline (~190k rows in export).
 
 | Column | Type | Description |
 |--------|------|-------------|
+| `typed_id` | text | OSM element with type prefix (e.g. `n123`, `w456`) |
 | `osm_id` | text | OpenStreetMap element ID |
+| `osm_type` | text | `node`, `way`, or `relation` |
 | `name` | text | POI name |
 | `fclass` | text | Fine class |
 | `super_category` | text | Category |
-| `lat` | double precision | WGS84 latitude |
-| `lon` | double precision | WGS84 longitude |
-| `geom` | geometry(Point, 4326) | PostGIS point |
+| `geom` | geometry(Point, 4326) | PostGIS point for spatial queries |
+| `lat` | double precision | Stored latitude (queries prefer `ST_Y(geom)`) |
+| `lon` | double precision | Stored longitude (queries prefer `ST_X(geom)`) |
+| `version` | integer | SCD2 version number |
+| `visible` | boolean | OSM visibility at version time |
 | `valid_from` | timestamptz | Version start (inclusive) |
 | `valid_to` | timestamptz | Version end (exclusive) |
-| `is_canonical` | boolean | `true` = deduplicated row for queries |
+| `valid_range` | tstzrange | Half-open `[valid_from, valid_to)` — use for temporal filters |
+| `matched_tag_key` | text | OSM tag key used for classification |
+| `poi_source` | text | Upstream derivation source |
+| `tags_json` | jsonb | Raw OSM tags snapshot |
+| `dedup_group` | text | Physical POI group (node/way duplicates share a group) |
+| `is_canonical` | boolean | `true` = preferred row within a `dedup_group` |
 
-**Query filter (required):** always include `is_canonical = true` and `valid_from <= as_of < valid_to`. See `POI_HISTORY_SCD2_WHERE` in `tables.py`.
+**Query filter (required):** `is_canonical IS TRUE` and `:as_of <@ valid_range`, then **one row per `dedup_group`** (closest geometry). Implemented in `PoiRepository` and `POI_HISTORY_SCD2_WHERE` in `tables.py`.
 
-**Source:** populated by the external POI pipeline or restored from [`data/poi_db_export.sql`](../data/poi_db_export.sql). There is no CSV import in this repo.
+**Indexes (production dump):** GiST on `geom` (geography cast), `valid_range`; btree on `dedup_group`, `is_canonical`, `osm_type`, `typed_id`.
+
+**Source:** populated by the POI cleaning & preprocessing pipeline (upcoming) or, for local development, restored from [`data/poi_db_export.sql`](../data/poi_db_export.sql). There is no CSV import in this repo.
 
 ### `active.audit_pipeline_runs`
 
@@ -96,12 +107,12 @@ Use `lat` / `lon` for simple distance logic; use `geom` with PostGIS (`ST_DWithi
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `run_timestamp` | timestamptz | When the external POI pipeline finished |
-| (other columns) | — | Run metadata maintained by the external pipeline |
+| `run_timestamp` | timestamptz | When the POI cleaning & preprocessing run finished |
+| (other columns) | — | Run metadata written by the POI pipeline |
 
 The feature pipeline uses `max(run_timestamp)` as the current POI version (`poi_refreshed_at`). This app does **not** write to this table.
 
-For taxonomy (`active.categories`, `active.category_mapping`) and full export details, see [`data/README.md`](../data/README.md).
+For taxonomy (`active.categories`, `active.category_mapping`) and full export details, see [POI_EXPORT.md](POI_EXPORT.md).
 
 ---
 
@@ -135,7 +146,7 @@ Without these tables, `dist_coast_km` and `land_buffer_fraction_1km` are NULL.
 
 ## Feature pipeline tables (app-owned)
 
-Created by [`scripts/schema/apply_feature_pipeline.py`](../scripts/schema/apply_feature_pipeline.py). See [RUNBOOK](RUNBOOK.md#feature-engineering-pipeline).
+Created by [`scripts/schema/apply_feature_pipeline.py`](../scripts/schema/apply_feature_pipeline.py). See [GUIDE.md](GUIDE.md#feature-pipeline).
 
 ### `production.properties` (pipeline input)
 
@@ -148,7 +159,7 @@ Slim index of locations to score. Only pipeline-needed columns — rich transact
 | `longitude` | double precision | WGS84 longitude |
 | `transaction_date` | date | Used by `historical_batch` for temporal POI lookup |
 
-Dev: [`scripts/ingest/load_properties_from_parquet.py`](../scripts/ingest/load_properties_from_parquet.py) loads parquet into `staging.transactions` and syncs slim rows here. Prod: external ETL copies coords from the 1M-row transactions table. Set `TRANSACTIONS_TABLE` so the Properties dashboard can join attributes at read time.
+Dev: [`scripts/ingest/load_properties_from_parquet.py`](../scripts/ingest/load_properties_from_parquet.py) loads parquet into `staging.transactions` and syncs slim rows here. Prod: an ETL step copies coords from the 1M-row transactions table. Set `TRANSACTIONS_TABLE` so property attributes can be joined at read time.
 
 ### `production.property_features` (output — ML input)
 
@@ -195,6 +206,6 @@ For tests without a full dump, CI applies [`scripts/schema/init_schema_ci.sql`](
 
 ## Schema change policy
 
-- **Production POI schema:** managed by the external pipeline — changes happen outside this repo.
+- **POI schema (`active.*`, `history.*`):** owned by the POI cleaning & preprocessing pipeline (upcoming). Until it lands, treat these tables as a fixed contract; the scoring app never alters them.
 - **App schema (`production.*`, `geo.*`):** apply via `scripts/schema/` SQL and update this doc in the same MR.
-- **When renaming tables:** update `backend/app/core/tables.py` first, then this file, [RUNBOOK](RUNBOOK.md), and [scripts/README.md](../scripts/README.md).
+- **When renaming tables:** update `backend/app/core/tables.py` first, then this file, [GUIDE.md](GUIDE.md), and [scripts/README.md](../scripts/README.md).
