@@ -18,7 +18,6 @@ from app.core.db import get_db
 from app.core.metrics import get_metrics
 from app.features.geo.router import router as geo_router
 from app.features.pois.router import router as pois_router
-from app.features.properties.router import router as properties_router
 from app.features.scores.router import router as scores_router
 
 app = FastAPI(
@@ -38,7 +37,6 @@ app.add_middleware(
 
 app.include_router(scores_router, prefix="/api/v1")
 app.include_router(pois_router, prefix="/api/v1")
-app.include_router(properties_router, prefix="/api/v1")
 app.include_router(geo_router, prefix="/api/v1")
 
 
