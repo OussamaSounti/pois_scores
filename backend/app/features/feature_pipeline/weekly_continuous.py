@@ -1,4 +1,8 @@
-"""Weekly continuous flow — Prefect-scheduled delta against the current snapshot.
+"""Weekly continuous flow — incremental scoring for newly appended properties.
+
+Scores only properties with **no** row in ``production.property_features`` yet,
+using ``active.production_pois_current`` (current POI snapshot). Transactions
+already enriched (e.g. via ``historical_batch``) are skipped.
 
 Supports parallel workers via ``concurrent.futures.ThreadPoolExecutor``.
 Each worker gets its own DB session and processes chunks from a shared
@@ -83,7 +87,10 @@ def run_weekly_continuous(
     workers: int | None = None,
     run: PipelineRunTracker | None = None,
 ) -> int:
-    """Score every property without a feature row at the current POI snapshot.
+    """Score newly appended properties not yet present in ``property_features``.
+
+    Uses the current POI snapshot; does not rescore transactions that already
+    have any feature row (historical or prior weekly).
 
     When *skip_errors* is True, individual property failures are logged and
     skipped instead of aborting the entire run. *workers* controls parallel

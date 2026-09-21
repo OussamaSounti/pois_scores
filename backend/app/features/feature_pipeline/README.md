@@ -161,6 +161,6 @@ run_weekly_continuous(chunk_size=200, skip_errors=True, workers=4)
 
 | Doc | Topic |
 |-----|-------|
-| [docs/RUNBOOK.md](../../../../docs/RUNBOOK.md) | Operations and Prefect |
+| [docs/GUIDE.md](../../../../docs/GUIDE.md) | Operations and Prefect |
 | [docs/DATA_MODEL.md](../../../../docs/DATA_MODEL.md) | `property_features` columns |
 | [scripts/README.md](../../../../scripts/README.md) | CLI command reference |
