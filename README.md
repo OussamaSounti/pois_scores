@@ -1,8 +1,12 @@
 # POI Scores — spatial location scoring for Morocco
 
+[![CI](https://github.com/OussamaSounti/pois_scores/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/OussamaSounti/pois_scores/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/demo-live-2ea44f)](https://pois-scores.vercel.app)
+[![API docs](https://img.shields.io/badge/API-OpenAPI-blue)](https://pois-scores.onrender.com/docs)
+
 **Score any coordinate in Morocco on a 0–100 "location quality" scale from the amenities around it — live through a REST API and interactive map, or in bulk through a versioned, temporally-aware feature pipeline that feeds ML models.**
 
-`Python` · `FastAPI` · `PostgreSQL/PostGIS` · `Prefect` · `React + Leaflet` · `Docker` · `pytest` · `GitLab CI`
+`Python` · `FastAPI` · `PostgreSQL/PostGIS` · `Prefect` · `React + Leaflet` · `Docker` · `pytest` · `GitHub Actions`
 
 🔗 **Live demo:** [pois-scores.vercel.app](https://pois-scores.vercel.app) — click anywhere on the map
 📘 **API docs (OpenAPI):** [pois-scores.onrender.com/docs](https://pois-scores.onrender.com/docs)

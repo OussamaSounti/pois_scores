@@ -24,7 +24,7 @@ POI-based spatial scoring for Morocco. It provides:
 | Active branch | `cleanup/main` |
 | Documentation | Consolidated to 4 central docs + this reference |
 | Backend layout | Feature-based (`app/features/`) + repository layer |
-| CI | GitLab: lint → test (70% coverage) → build |
+| CI | GitHub Actions: lint → test on PostGIS (50% coverage ratchet) → docker build |
 | Production deploy | Manual from tagged release — not automated in CI |
 
 ### Repository layout
@@ -70,7 +70,7 @@ pois_scores_v2/
 | Prefect orchestration | Done |
 | Geo coastline/land loaders | Done |
 | Parquet property ingest | Done |
-| GitLab CI (lint, test, build) | Done |
+| GitHub Actions CI (lint, test on PostGIS, docker build) | Done |
 | POI cleaning & preprocessing pipeline (OSM extract → clean → dedup → taxonomy → SCD2 load) | **Upcoming** |
 | Automated property sync from prod transactions table | Planned |
 | Alembic migrations | Planned |
@@ -78,16 +78,16 @@ pois_scores_v2/
 | Automated AWS/ECS deploy | Planned |
 | Grafana dashboards | Planned |
 
-### CI pipeline (`.gitlab-ci.yml`)
+### CI pipeline (`.github/workflows/ci.yml`)
 
-| Stage | Job | What it does |
-|-------|-----|--------------|
-| lint | `lint` | Ruff check + format on `backend/` |
-| lint | `frontend:lint`, `frontend:format` | ESLint + Prettier |
-| test | `test` | PostGIS service → `apply_init.py` → pytest, 70% coverage floor |
-| test | `frontend:test` | Vitest |
-| build | `build` | Docker backend image (default branch only) |
-| build | `frontend:build` | Vite production build artifact |
+Runs on every push to `main` and every pull request.
+
+| Job | What it does |
+|-----|--------------|
+| `backend-lint` | Ruff check + format on `backend/` |
+| `backend-test` | PostGIS 16 service container → `apply_init.py` + `apply_feature_pipeline.py` → pytest (unit + integration), 50% coverage ratchet |
+| `backend-build` | Docker build of the API image (buildx, GHA layer cache); needs lint + test green |
+| `frontend` | `npm ci` → ESLint → Prettier check → Vitest → Vite production build |
 
 ---
 

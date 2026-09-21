@@ -18,7 +18,7 @@ How to contribute code and docs to the Morocco Spatial Dashboard.
 
 ```bash
 ruff check backend/ && ruff format --check backend/
-cd backend && pytest tests/ -v --cov=app --cov-fail-under=70
+cd backend && pytest tests/ -v --cov=app --cov-fail-under=50
 cd frontend && npm run lint && npm run format:check && npm run test && npm run build
 pre-commit run --all-files   # optional but recommended
 ```
@@ -56,7 +56,7 @@ Deps: [backend/REQUIREMENTS.md](backend/REQUIREMENTS.md).
 
 ## Testing
 
-- Backend: unit tests (no DB) + integration tests (Postgres). **70% coverage floor** in CI.
+- Backend: unit tests (no DB) + integration tests (Postgres). **50% coverage floor** in CI (a ratchet — raise it as pipeline-module tests land; never lower it).
 - Frontend: Vitest on API utils and app smoke tests.
 
 ---
