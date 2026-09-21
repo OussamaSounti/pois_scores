@@ -197,6 +197,42 @@ Backend without Docker: `docker compose up -d db` then `uvicorn app.main:app --r
 
 No secrets in the repo — use `.env` or platform config.
 
+### Free-tier public demo (Supabase + Render + Vercel)
+
+How the live demo at [pois-scores.vercel.app](https://pois-scores.vercel.app) is hosted. Zero cost; all three services deploy from the `main` branch.
+
+| Layer | Service | Notes |
+|-------|---------|-------|
+| PostGIS | **Supabase** (free) | 500 MB — the ~100 MB POI dump fits |
+| API | **Render** web service (free, Docker) | Uses `backend/Dockerfile`; sleeps after 15 min idle |
+| Dashboard | **Vercel** (free) | Static Vite build of `frontend/` |
+| Keep-alive | **UptimeRobot** (free) | Pings `/ready` every 5 min so neither Render nor Supabase sleeps |
+
+**1. Database (Supabase)**
+
+Enable PostGIS in `public` (the dump references `public.geometry`), then load with the *session pooler* URL (port 5432). Pipe the file with `psql -f` — not through a PowerShell `Get-Content` pipe, which re-encodes the COPY blocks.
+
+```bash
+psql "$SESSION_POOLER_URL" -c "CREATE EXTENSION IF NOT EXISTS postgis SCHEMA public;"
+psql "$SESSION_POOLER_URL" -v ON_ERROR_STOP=0 -q -f data/poi_db_export.sql
+DATABASE_URL="$SESSION_POOLER_URL" python scripts/schema/apply_feature_pipeline.py
+DATABASE_URL="$SESSION_POOLER_URL" python scripts/ingest/load_osm_land.py
+DATABASE_URL="$SESSION_POOLER_URL" python scripts/ingest/load_osm_coastline.py
+```
+
+**2. API (Render)** — New Web Service → repo, branch `main`, Root Directory `backend`, Runtime Docker, Health Check Path `/ready`. Environment:
+
+| Key | Value |
+|-----|-------|
+| `DATABASE_URL` | *transaction pooler* URL (port **6543**, IPv4) |
+| `TRANSACTIONS_TABLE` | *(empty — no transactions table in the demo)* |
+| `CORS_ORIGINS` | `https://<app>.vercel.app` |
+| `LOG_LEVEL` / `PIPELINE_VERSION` | `info` / `1.0` |
+
+**3. Dashboard (Vercel)** — Import repo, Root Directory `frontend`, Framework Vite. Set `VITE_API_URL=https://<svc>.onrender.com` **before** the first build (it is compiled in; change → redeploy).
+
+**4. Verify** — `curl "https://<svc>.onrender.com/api/v1/scores?lat=33.5731&lon=-7.5898"` returns scores; the map responds to clicks in an incognito window. A "Failed to fetch" in the browser means the API URL or `CORS_ORIGINS` doesn't match exactly (scheme, host, no trailing slash).
+
 ---
 
 ## Part 4 — Release and rollback

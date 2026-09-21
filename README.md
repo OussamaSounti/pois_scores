@@ -4,6 +4,15 @@
 
 `Python` · `FastAPI` · `PostgreSQL/PostGIS` · `Prefect` · `React + Leaflet` · `Docker` · `pytest` · `GitLab CI`
 
+🔗 **Live demo:** [pois-scores.vercel.app](https://pois-scores.vercel.app) — click anywhere on the map
+📘 **API docs (OpenAPI):** [pois-scores.onrender.com/docs](https://pois-scores.onrender.com/docs)
+
+> Runs on free tiers (Vercel + Render + Supabase). The first request after idle can take ~30 s while the API wakes up.
+
+```bash
+curl "https://pois-scores.onrender.com/api/v1/scores?lat=33.5731&lon=-7.5898"
+```
+
 ---
 
 ## The problem
