@@ -18,6 +18,10 @@
 curl "https://pois-scores.onrender.com/api/v1/scores?lat=33.5731&lon=-7.5898"
 ```
 
+[![POI Scores dashboard — Casablanca scored as of 2016-07-22: 249 POIs within 1 km, category density, 400 m accessibility grid](docs/images/dashboard-single.jpg)](https://pois-scores.vercel.app)
+
+<sub>Central Casablanca scored **as of 22 July 2016** — the SCD2 history table reconstructs the POI landscape at that date (249 POIs within 1 km). Left: category density and 400 m walk accessibility. Right: nearest POIs with distances.</sub>
+
 ---
 
 ## The problem
@@ -52,6 +56,13 @@ Every score is built from POIs within a 1 km buffer and a 400 m walking radius:
 - **Accessibility (40 %)** — share of 13 essential amenity types (pharmacy, school, bus stop, supermarket, …) reachable within 400 m.
 
 Plus nearest-distance per category (up to 25 km) and distance to coastline. Full formulas: [docs/POI_SCORES.md](docs/POI_SCORES.md).
+
+<details>
+<summary>Screenshot — nearest POI per category, coastal proximity and the land-fraction buffer</summary>
+
+![Dashboard showing nearest distance per category (Healthcare 0.09 km … Religion 0.68 km), 1.10 km to the coastline, and a 100 % land buffer](docs/images/dashboard-nearest-coast.jpg)
+
+</details>
 
 **Temporal correctness.** POI tables are versioned (SCD2). The historical pipeline scores each transaction against the POI landscape *as it was on the transaction date*, not today's snapshot — no leakage from the future into training features.
 
