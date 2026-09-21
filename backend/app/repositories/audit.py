@@ -32,7 +32,7 @@ class AuditRepository:
         return row if row.tzinfo else row.replace(tzinfo=timezone.utc)
 
     def current_poi_ts(self) -> datetime:
-        """Latest external POI refresh timestamp, or now() when the table is empty."""
+        """Latest POI pipeline refresh timestamp, or now() when the table is empty."""
         ts = self.latest_run_timestamp()
         if ts is not None:
             return ts

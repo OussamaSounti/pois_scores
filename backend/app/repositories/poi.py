@@ -1,4 +1,4 @@
-"""POI table queries against the external POI contract."""
+"""POI table queries against the POI pipeline output tables (``active.*`` / ``history.*``)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,13 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.spatial import _as_of_ts
-from app.core.tables import POI_HISTORY_SCD2_WHERE, T_POIS_CURRENT, T_POI_HISTORY
+from app.core.tables import (
+    T_POIS_CURRENT,
+    T_POI_HISTORY,
+    poi_history_scd2_where,
+    poi_lat_expr,
+    poi_lon_expr,
+)
 
 
 @dataclass
@@ -36,6 +42,28 @@ def _row_to_poi(row: Any) -> PoiRow:
     )
 
 
+def _history_dedup_cte(radius_m_sql: str) -> str:
+    """CTE pair (pt, pois) — one row per dedup_group, closest geometry wins."""
+    where = poi_history_scd2_where("h")
+    lat = poi_lat_expr("h")
+    lon = poi_lon_expr("h")
+    return f"""
+      pt AS (
+        SELECT ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography AS geog
+      ),
+      pois AS (
+        SELECT DISTINCT ON (h.dedup_group)
+          h.osm_id, h.name, h.fclass, h.super_category,
+          {lat} AS lat, {lon} AS lon,
+          ST_Distance(h.geom::geography, (SELECT geog FROM pt)) AS dist_m
+        FROM {T_POI_HISTORY} h, pt
+        WHERE {where}
+          AND ST_DWithin(h.geom::geography, pt.geog, {radius_m_sql})
+        ORDER BY h.dedup_group, dist_m
+      )
+    """
+
+
 class PoiRepository:
     """Reads from active.production_pois_current and history.production_poi_history."""
 
@@ -46,7 +74,8 @@ class PoiRepository:
         """POIs in the current snapshot within radius_m of (lat, lon)."""
         radius_m = max(0, min(radius_m, 100_000))
         sql = text(f"""
-            SELECT osm_id, name, fclass, super_category, lat, lon
+            SELECT osm_id, name, fclass, super_category,
+                   {poi_lat_expr()} AS lat, {poi_lon_expr()} AS lon
             FROM {T_POIS_CURRENT}
             WHERE ST_DWithin(
                 geom::geography,
@@ -68,7 +97,8 @@ class PoiRepository:
         """POIs within radius_m with distance_km for list/map display."""
         radius_m = max(0, min(radius_m, 25_000))
         sql = text(f"""
-            SELECT osm_id, name, fclass, super_category, lat, lon,
+            SELECT osm_id, name, fclass, super_category,
+                   {poi_lat_expr()} AS lat, {poi_lon_expr()} AS lon,
                    ST_Distance(
                        geom::geography,
                        ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
@@ -131,18 +161,13 @@ class PoiRepository:
         radius_m: float,
         as_of: date | datetime,
     ) -> list[PoiRow]:
-        """POIs from history active at as_of within radius_m."""
+        """POIs from history active at as_of within radius_m (deduped by dedup_group)."""
         radius_m = max(0, min(radius_m, 100_000))
         ts = _as_of_ts(as_of)
         sql = text(f"""
+            WITH {_history_dedup_cte(":radius_m")}
             SELECT osm_id, name, fclass, super_category, lat, lon
-            FROM {T_POI_HISTORY}
-            WHERE {POI_HISTORY_SCD2_WHERE}
-              AND ST_DWithin(
-                geom::geography,
-                ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
-                :radius_m
-              )
+            FROM pois
         """)
         params = {"as_of": ts, "lat": lat, "lon": lon, "radius_m": radius_m}
         rows = self._session.execute(sql, params).fetchall()
@@ -159,18 +184,10 @@ class PoiRepository:
         radius_m = max(0, min(radius_m, 25_000))
         ts = _as_of_ts(as_of) if as_of is not None else None
         sql = text(f"""
+            WITH {_history_dedup_cte(":radius_m")}
             SELECT osm_id, name, fclass, super_category, lat, lon,
-                   ST_Distance(
-                       geom::geography,
-                       ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
-                   ) / 1000.0 AS dist_km
-            FROM {T_POI_HISTORY}
-            WHERE {POI_HISTORY_SCD2_WHERE}
-              AND ST_DWithin(
-                geom::geography,
-                ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
-                :radius_m
-              )
+                   dist_m / 1000.0 AS dist_km
+            FROM pois
             ORDER BY dist_km
         """)
         params = {"as_of": ts, "lat": lat, "lon": lon, "radius_m": radius_m}
@@ -198,18 +215,9 @@ class PoiRepository:
         """Min distance in km to nearest POI per super_category at as_of (history)."""
         ts = _as_of_ts(as_of)
         sql = text(f"""
-            SELECT super_category,
-                   MIN(ST_Distance(
-                       geom::geography,
-                       ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
-                   )) / 1000.0 AS dist_km
-            FROM {T_POI_HISTORY}
-            WHERE {POI_HISTORY_SCD2_WHERE}
-              AND ST_DWithin(
-                geom::geography,
-                ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
-                :max_radius_m
-              )
+            WITH {_history_dedup_cte(":max_radius_m")}
+            SELECT super_category, MIN(dist_m) / 1000.0 AS dist_km
+            FROM pois
             GROUP BY super_category
         """)
         rows = self._session.execute(
@@ -237,7 +245,8 @@ class PoiRepository:
                 SELECT ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography AS geog
               ),
               pois AS (
-                SELECT osm_id, name, fclass, super_category, lat, lon,
+                SELECT osm_id, name, fclass, super_category,
+                       {poi_lat_expr()} AS lat, {poi_lon_expr()} AS lon,
                        ST_Distance(geom::geography, (SELECT geog FROM pt)) AS dist_m
                 FROM {T_POIS_CURRENT}
                 WHERE ST_DWithin(
@@ -278,19 +287,7 @@ class PoiRepository:
         """
         ts = _as_of_ts(as_of)
         sql = text(f"""
-            WITH
-              pt AS (
-                SELECT ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography AS geog
-              ),
-              pois AS (
-                SELECT osm_id, name, fclass, super_category, lat, lon,
-                       ST_Distance(geom::geography, (SELECT geog FROM pt)) AS dist_m
-                FROM {T_POI_HISTORY}
-                WHERE {POI_HISTORY_SCD2_WHERE}
-                  AND ST_DWithin(
-                      geom::geography, (SELECT geog FROM pt), 25000
-                  )
-              )
+            WITH {_history_dedup_cte("25000")}
             SELECT osm_id, name, fclass, super_category, lat, lon, dist_m
             FROM pois
             ORDER BY dist_m

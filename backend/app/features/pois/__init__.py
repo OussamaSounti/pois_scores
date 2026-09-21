@@ -1,8 +1,8 @@
 """POI feature: HTTP listing endpoint and POI-table queries.
 
-Owns every read against the external contract tables
+Owns every read against the POI pipeline output tables
 ``active.production_pois_current`` (flat current snapshot) and
-``history.production_poi_history`` (SCD2, requires ``is_canonical = true``).
+``history.production_poi_history`` (SCD2, ``is_canonical`` + ``dedup_group`` dedup).
 """
 
 from app.features.pois.router import router

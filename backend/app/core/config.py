@@ -10,6 +10,8 @@ POI source enums) live in ``app.core.constants`` and are not configurable.
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.tables import T_TRANSACTIONS_DEV
+
 
 class Settings(BaseSettings):
     """Typed environment settings loaded from process env and ``.env`` files."""
@@ -26,8 +28,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://localhost:8000"
 
     # Fully-qualified source transactions table for dashboard joins and property sync.
-    # Example: analytics.transactions. Empty = no join (slim properties only).
-    transactions_table: str = ""
+    # Example: analytics.transactions. Set to empty string to disable joins (slim properties only).
+    transactions_table: str = T_TRANSACTIONS_DEV
 
     # Version label written to production.property_features.pipeline_version.
     pipeline_version: str = "1.0"

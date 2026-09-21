@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class PoiItemOut(BaseModel):
     """One POI with distance for list/map display.
 
-    Field names follow the external POI contract (``osm_id``, ``lat``, ``lon``)
+    Field names follow the POI table contract (``osm_id``, ``lat``, ``lon``)
     so the wire format mirrors the underlying tables.
     """
 

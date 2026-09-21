@@ -3,7 +3,7 @@
 Two source tables, both produced by an upstream pipeline:
 
 - ``active.production_pois_current``: flat snapshot.
-- ``history.production_poi_history``: SCD2 with ``is_canonical`` filter.
+- ``history.production_poi_history``: SCD2 with ``valid_range`` + ``dedup_group`` dedup.
 
 The taxonomy ``super_category`` is pre-resolved upstream; this module never
 re-derives it from raw tags.

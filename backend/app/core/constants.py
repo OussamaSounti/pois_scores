@@ -44,8 +44,6 @@ __all__ = [
     "BATCH_MAX_LOCATIONS",
     "CHUNK_SIZE",
     "DEFAULT_RADIUS_KM",
-    "HIERARCHY_LEVELS",
-    "HIERARCHY_LEVEL_PATTERN",
     "HIERARCHY_UID_FIELDS",
     "KM_TO_M",
     "MAX_POI_RADIUS_KM",
@@ -64,8 +62,6 @@ __all__ = [
     "RUN_STATUS_SUCCESS",
     "TRIGGERED_BY_CLI",
     "TRIGGERED_BY_PREFECT",
-    "PROPERTIES_MAP_DEFAULT_LIMIT",
-    "PROPERTIES_MAP_MAX_LIMIT",
     "PROPERTY_FEATURE_COLUMNS",
 ]
 
@@ -104,9 +100,6 @@ ACCESSIBILITY_RADIUS_M: float = 400.0
 
 BATCH_MAX_LOCATIONS: int = 500
 
-PROPERTIES_MAP_DEFAULT_LIMIT: int = 1200
-PROPERTIES_MAP_MAX_LIMIT: int = 5000
-
 POI_SOURCE_HISTORY: str = "history"
 POI_SOURCE_CURRENT: str = "current"
 
@@ -122,6 +115,4 @@ RUN_STATUS_SKIPPED: str = "skipped"
 TRIGGERED_BY_CLI: str = "cli"
 TRIGGERED_BY_PREFECT: str = "prefect"
 
-HIERARCHY_LEVELS: tuple[str, ...] = ("district", "neighbourhood", "iris", "ilot")
-HIERARCHY_LEVEL_PATTERN: str = "^(" + "|".join(HIERARCHY_LEVELS) + ")$"
-HIERARCHY_UID_FIELDS: tuple[str, ...] = tuple(f"{lvl}_uid" for lvl in HIERARCHY_LEVELS)
+HIERARCHY_UID_FIELDS: tuple[str, ...] = ("district_uid", "neighbourhood_uid", "iris_uid", "ilot_uid")
