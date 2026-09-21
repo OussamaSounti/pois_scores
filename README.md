@@ -3,6 +3,7 @@
 [![CI](https://github.com/OussamaSounti/pois_scores/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/OussamaSounti/pois_scores/actions/workflows/ci.yml)
 [![Live demo](https://img.shields.io/badge/demo-live-2ea44f)](https://pois-scores.vercel.app)
 [![API docs](https://img.shields.io/badge/API-OpenAPI-blue)](https://pois-scores.onrender.com/docs)
+[![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
 **Score any coordinate in Morocco on a 0–100 "location quality" scale from the amenities around it — live through a REST API and interactive map, or in bulk through a versioned, temporally-aware feature pipeline that feeds ML models.**
 
